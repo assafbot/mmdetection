@@ -24,7 +24,7 @@ class ClipHead(BaseDenseHead):
             class_tokens = clip_processor(text=class_names, return_tensors="pt", padding=True)
             class_features = clip_model.text_model(**class_tokens)[1]
             class_embeddings = clip_model.text_projection(class_features)
-            class_embeddings = class_embeddings / class_embeddings.norm(dim=1, keepdim=True)
+            class_embeddings = class_embeddings / class_embeddings.norm(p=2, dim=1, keepdim=True)
 
         num_classes, emb_dim = class_embeddings.shape
 
