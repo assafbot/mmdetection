@@ -4,6 +4,6 @@ pycocotools
 scipy
 six
 terminaltables
-
+transformers
 future
 tensorboard
