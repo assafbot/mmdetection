@@ -4,3 +4,6 @@ pycocotools
 scipy
 six
 terminaltables
+
+future
+tensorboard
