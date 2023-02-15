@@ -1,7 +1,7 @@
+from typing import Optional, Dict
+
 from mmengine.dist import master_only
 from mmengine.hooks import Hook
-from mmengine.runner import Runner
-from typing import Optional, Dict
 
 from mmdet.registry import HOOKS
 

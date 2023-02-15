@@ -1,14 +1,21 @@
 import torch
-from transformers import CLIPProcessor, CLIPModel
 
 from mmdet.datasets import CocoDataset
 from mmdet.models.dense_heads.base_dense_head import BaseDenseHead
 from mmdet.registry import MODELS
 
+try:
+    from transformers import CLIPProcessor, CLIPModel
+except ImportError:
+    CLIPProcessor, CLIPModel = None, None
+
 
 @MODELS.register_module()
 class ClipHead(BaseDenseHead):
     def __new__(cls, bbox_head, **kwargs):
+        if CLIPModel is None or CLIPProcessor is None:
+            raise ImportError('Please run "pip install transformers" to use ClipHead')
+
         with torch.no_grad():
             # TODO: @assaf support any dataset / dynamic input
             class_names = CocoDataset.METAINFO['classes']
@@ -17,6 +24,7 @@ class ClipHead(BaseDenseHead):
             class_tokens = clip_processor(text=class_names, return_tensors="pt", padding=True)
             class_features = clip_model.text_model(**class_tokens)[1]
             class_embeddings = clip_model.text_projection(class_features)
+            class_embeddings = class_embeddings / class_embeddings.norm(dim=1, keepdim=True)
 
         num_classes, emb_dim = class_embeddings.shape
 
