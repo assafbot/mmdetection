@@ -2,6 +2,7 @@ import torch
 
 from mmdet.datasets import CocoDataset
 from mmdet.models.dense_heads.base_dense_head import BaseDenseHead
+from mmdet.models.dense_heads.retina_head import RetinaHead
 from mmdet.registry import MODELS
 
 try:
@@ -25,6 +26,7 @@ class ClipHead(BaseDenseHead):
             class_features = clip_model.text_model(**class_tokens)[1]
             class_embeddings = clip_model.text_projection(class_features)
             class_embeddings = class_embeddings / class_embeddings.norm(p=2, dim=1, keepdim=True)
+            class_embeddings = torch.nn.Parameter(class_embeddings, requires_grad=False)
 
         num_classes, emb_dim = class_embeddings.shape
 
@@ -33,15 +35,28 @@ class ClipHead(BaseDenseHead):
         assert bbox_head['num_classes'] == num_classes
         bbox_head['num_classes'] = emb_dim
         bbox_head = MODELS.build(bbox_head)
-        # assert isinstance(bbox_head, DETRHead)
+        bbox_head.register_parameter('clip_class_embeddings', class_embeddings)
+        assert isinstance(bbox_head, RetinaHead)  # TODO: @assaf could this simply be AnchorHead?
+        assert bbox_head.use_sigmoid_cls
 
-        def forward(*args, **kwargs):
+        def forward_retinanet(*args, **kwargs):
             output = bbox_head._forward(*args, **kwargs)
-            pred = torch.nn.functional.linear(output[0], class_embeddings.to(output[0].device))
-            return (pred,) + output[1:]
+            for idx, pred in enumerate(output[0]):
+                n, c, h, w = pred.shape
+                pred = pred.permute(0, 2, 3, 1).reshape(n, h, w, -1, emb_dim)
+                pred = torch.nn.functional.linear(pred, bbox_head.clip_class_embeddings)
+                pred = pred.reshape(n, h, w, -1).permute(0, 3, 1, 2)
+                output[0][idx] = pred
+
+            return output
+
+        # def forward_dino(*args, **kwargs):
+        #     output = bbox_head._forward(*args, **kwargs)
+        #     pred = torch.nn.functional.linear(output[0], class_embeddings.to(output[0].device))
+        #     return (pred,) + output[1:]
 
         bbox_head._forward = bbox_head.forward
-        bbox_head.forward = forward
+        bbox_head.forward = forward_retinanet
         bbox_head.cls_out_channels = num_classes
         bbox_head.num_classes = num_classes
 
