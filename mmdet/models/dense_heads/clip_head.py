@@ -44,6 +44,7 @@ class ClipHead(BaseDenseHead):
             for idx, pred in enumerate(output[0]):
                 n, c, h, w = pred.shape
                 pred = pred.permute(0, 2, 3, 1).reshape(n, h, w, -1, emb_dim)
+                pred = pred / pred.norm(p=2, dim=-1, keepdim=True)
                 pred = torch.nn.functional.linear(pred, bbox_head.clip_class_embeddings)
                 pred = pred.reshape(n, h, w, -1).permute(0, 3, 1, 2)
                 output[0][idx] = pred
