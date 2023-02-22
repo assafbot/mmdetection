@@ -9,10 +9,11 @@ from mmdet.registry import HOOKS
 @HOOKS.register_module()
 class ClearMLLoggerHook(Hook):
     def __init__(self, init_kwargs: Optional[Dict] = None, task_type=None) -> None:
-        self.import_clearml()
+        self.clearml = None
         self.task = None
-        self.task_type = self.clearml.TaskTypes(task_type or 'training')
         self.init_kwargs = init_kwargs
+        self.import_clearml()
+        self.task_type = self.clearml.TaskTypes(task_type or 'training')
 
     def import_clearml(self):
         try:
