@@ -6,25 +6,35 @@ from mmdet.models.dense_heads.retina_head import RetinaHead
 from mmdet.registry import MODELS
 
 try:
+    import open_clip
     from transformers import CLIPProcessor, CLIPModel
 except ImportError:
+    open_clip = None
     CLIPProcessor, CLIPModel = None, None
 
 
 @MODELS.register_module()
 class ClipHead(BaseDenseHead):
     def __new__(cls, bbox_head, **kwargs):
-        if CLIPModel is None or CLIPProcessor is None:
-            raise ImportError('Please run "pip install transformers" to use ClipHead')
-
         with torch.no_grad():
             # TODO: @assaf support any dataset / dynamic input
             class_names = CocoDataset.METAINFO['classes']
-            clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-            clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-            class_tokens = clip_processor(text=class_names, return_tensors="pt", padding=True)
-            class_features = clip_model.text_model(**class_tokens)[1]
-            class_embeddings = clip_model.text_projection(class_features)
+
+            if True:
+                if open_clip is None:
+                    raise ImportError('Please run "pip install open_clip_torch" to use ClipHead')
+                model, _, _ = open_clip.create_model_and_transforms('RN50x4', pretrained='openai')
+                tokenizer = open_clip.get_tokenizer('RN50x4')
+                class_embeddings = model.encode_text(tokenizer(class_names))
+            else:
+                if CLIPModel is None or CLIPProcessor is None:
+                    raise ImportError('Please run "pip install transformers" to use ClipHead')
+                clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+                clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+                class_tokens = clip_processor(text=class_names, return_tensors="pt", padding=True)
+                class_features = clip_model.text_model(**class_tokens)[1]
+                class_embeddings = clip_model.text_projection(class_features)
+
             class_embeddings = class_embeddings / class_embeddings.norm(p=2, dim=1, keepdim=True)
             class_embeddings = torch.nn.Parameter(class_embeddings, requires_grad=False)
 
@@ -46,6 +56,7 @@ class ClipHead(BaseDenseHead):
                 pred = pred.permute(0, 2, 3, 1).reshape(n, h, w, -1, emb_dim)
                 pred = pred / pred.norm(p=2, dim=-1, keepdim=True)
                 pred = torch.nn.functional.linear(pred, bbox_head.clip_class_embeddings)
+                pred *= 100
                 pred = pred.reshape(n, h, w, -1).permute(0, 3, 1, 2)
                 output[0][idx] = pred
 
