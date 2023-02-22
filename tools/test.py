@@ -121,7 +121,6 @@ def main():
     # Set clearml task type to testing
     for custom_hook in cfg.custom_hooks:
         if custom_hook.type == ClearMLLoggerHook.__name__:
-            assert 'task_type' not in custom_hook
             custom_hook['task_type'] = 'testing'
 
     # build the runner from config
