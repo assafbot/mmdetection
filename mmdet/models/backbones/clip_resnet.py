@@ -1,6 +1,9 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import logging
+
 import torch
-from mmengine.model import BaseModule
+from mmengine.logging import MMLogger, print_log
+from mmengine.model import BaseModule, ModuleList
 from torch.nn.modules.batchnorm import _BatchNorm
 
 from mmdet.registry import MODELS
@@ -14,10 +17,9 @@ except ImportError:
 @MODELS.register_module()
 class ClipResNet(BaseModule):
     def __init__(self, init_cfg=None, out_indices=None, frozen_stages=-1, norm_eval=True):
+        super(ClipResNet, self).__init__(init_cfg)
         if open_clip is None:
             raise ImportError(f'Please run "pip install open_clip_torch" to use {self.__class__.__name__}')
-
-        super(ClipResNet, self).__init__(init_cfg)
 
         model, _, _ = open_clip.create_model_and_transforms('RN50x4', pretrained='openai')
         rn = model.visual
@@ -25,7 +27,7 @@ class ClipResNet(BaseModule):
                                    rn.conv2, rn.bn2, rn.act2,
                                    rn.conv3, rn.bn3, rn.act3,
                                    rn.avgpool)
-        self.layers = torch.nn.ModuleList([stem, rn.layer1, rn.layer2, rn.layer3, rn.layer4])
+        self.layers = ModuleList([stem, rn.layer1, rn.layer2, rn.layer3, rn.layer4])
         self.out_indices = list(sorted(out_indices or [len(self.layers)-1]))
         self.frozen_stages = frozen_stages
         self.norm_eval = norm_eval
@@ -55,14 +57,3 @@ class ClipResNet(BaseModule):
                 outputs.append(x)
 
         return tuple(outputs)
-
-
-if __name__ == '__main__':
-    from PIL import Image
-    model = ClipResNet(out_indices=(1, 2, 3, 4), frozen_stages=1)
-    _, _, eval_transform = open_clip.create_model_and_transforms('RN50', pretrained='openai')
-
-    image_path = '/home/assaf/mentee/images/bedroom2.png'
-    image = eval_transform(Image.open(image_path)).unsqueeze(0)
-    with torch.no_grad():
-        model(image)

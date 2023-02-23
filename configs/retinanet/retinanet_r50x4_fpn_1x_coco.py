@@ -14,7 +14,10 @@ model = dict(
         type='ClipResNet',
         out_indices=(1, 2, 3, 4),
         frozen_stages=1,
-        norm_eval=True
+        norm_eval=True,
+
+        # workaround for empty init_cfg issue. doesn't do anything
+        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')
     ),
     neck=dict(
         _delete_=True,
