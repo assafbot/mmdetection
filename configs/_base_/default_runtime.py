@@ -23,4 +23,8 @@ log_level = 'INFO'
 load_from = None
 resume = False
 
-custom_hooks = [dict(type='ClearMLLoggerHook')]
+custom_hooks = [
+    dict(type='ClearMLLoggerHook'),
+    dict(type='NumClassCheckHook'),
+    dict(type='CheckInvalidLossHook', interval=50, priority='VERY_LOW'),
+]
