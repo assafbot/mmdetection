@@ -1,6 +1,6 @@
 # dataset settings
 dataset_type = 'OpenImagesDataset'
-data_root = 'data/OpenImages/'
+data_root = '/data/openimages/'
 
 # file_client_args = dict(
 #     backend='petrel',
@@ -39,11 +39,11 @@ train_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file='annotations/oidv6-train-annotations-bbox.csv',
-        data_prefix=dict(img='OpenImages/train/'),
-        label_file='annotations/class-descriptions-boxable.csv',
-        hierarchy_file='annotations/bbox_labels_600_hierarchy.json',
-        meta_file='annotations/train-image-metas.pkl',
+        ann_file='annotations_v6/oidv6-train-annotations-bbox.csv',
+        data_prefix=dict(img='train/'),
+        label_file='annotations_v6/class-descriptions-boxable.csv',
+        hierarchy_file='annotations_v6/bbox_labels_600_hierarchy.json',
+        meta_file='annotations_v6/train-image-metas.pkl',
         pipeline=train_pipeline))
 val_dataloader = dict(
     batch_size=1,
@@ -54,12 +54,12 @@ val_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file='annotations/validation-annotations-bbox.csv',
-        data_prefix=dict(img='OpenImages/validation/'),
-        label_file='annotations/class-descriptions-boxable.csv',
-        hierarchy_file='annotations/bbox_labels_600_hierarchy.json',
-        meta_file='annotations/validation-image-metas.pkl',
-        image_level_ann_file='annotations/validation-'
+        ann_file='annotations_v6/validation-annotations-bbox.csv',
+        data_prefix=dict(img='validation/'),
+        label_file='annotations_v6/class-descriptions-boxable.csv',
+        hierarchy_file='annotations_v6/bbox_labels_600_hierarchy.json',
+        meta_file='annotations_v6/validation-image-metas.pkl',
+        image_level_ann_file='annotations_v6/validation-'
         'annotations-human-imagelabels-boxable.csv',
         pipeline=test_pipeline))
 test_dataloader = val_dataloader

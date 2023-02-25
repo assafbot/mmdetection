@@ -1,18 +1,19 @@
+from typing import Optional, Dict
+
 from mmengine.dist import master_only
 from mmengine.hooks import Hook
-from mmengine.runner import Runner
-from typing import Optional, Dict
 
 from mmdet.registry import HOOKS
 
 
 @HOOKS.register_module()
 class ClearMLLoggerHook(Hook):
-    def __init__(self, init_kwargs: Optional[Dict] = None) -> None:
+    def __init__(self, init_kwargs: Optional[Dict] = None, task_type=None) -> None:
         self.clearml = None
         self.task = None
         self.init_kwargs = init_kwargs
         self.import_clearml()
+        self.task_type = self.clearml.TaskTypes(task_type or 'training')
 
     def import_clearml(self):
         try:
@@ -26,4 +27,6 @@ class ClearMLLoggerHook(Hook):
         task_kwargs = self.init_kwargs if self.init_kwargs else {}
         if 'task_name' not in task_kwargs:
             task_kwargs['task_name'] = runner.experiment_name
+        assert 'task_type' not in task_kwargs
+        task_kwargs['task_type'] = self.task_type
         self.task = self.clearml.Task.init(**task_kwargs)

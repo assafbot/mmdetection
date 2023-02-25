@@ -1,6 +1,6 @@
 # dataset settings
 dataset_type = 'CocoDataset'
-data_root = 'data/coco/'
+data_root = '/data/datasets/coco/'
 
 # file_client_args = dict(
 #     backend='petrel',

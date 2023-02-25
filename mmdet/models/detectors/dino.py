@@ -160,8 +160,7 @@ class DINO(DeformableDETR):
               and `dn_meta` when `self.training` is `True`, else is empty.
         """
         bs, _, c = memory.shape
-        cls_out_features = self.bbox_head.cls_branches[
-            self.decoder.num_layers].out_features
+        cls_out_features = self.bbox_head.cls_out_channels
 
         output_memory, output_proposals = self.gen_encoder_output_proposals(
             memory, memory_mask, spatial_shapes)

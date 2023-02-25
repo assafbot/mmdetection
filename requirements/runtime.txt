@@ -4,6 +4,7 @@ pycocotools
 scipy
 six
 terminaltables
-
+transformers
+open_clip_torch
 future
 tensorboard

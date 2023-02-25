@@ -9,6 +9,7 @@ from mmengine import ConfigDict
 from mmengine.config import Config, DictAction
 from mmengine.runner import Runner
 
+from mmdet.engine import ClearMLLoggerHook
 from mmdet.engine.hooks.utils import trigger_visualization_hook
 from mmdet.evaluation import DumpDetResults
 from mmdet.registry import RUNNERS
@@ -116,6 +117,11 @@ def main():
             cfg.tta_pipeline[-1] = flip_tta
         cfg.model = ConfigDict(**cfg.tta_model, module=cfg.model)
         cfg.test_dataloader.dataset.pipeline = cfg.tta_pipeline
+
+    # Set clearml task type to testing
+    for custom_hook in cfg.custom_hooks:
+        if custom_hook.type == ClearMLLoggerHook.__name__:
+            custom_hook['task_type'] = 'testing'
 
     # build the runner from config
     if 'runner_type' not in cfg:
