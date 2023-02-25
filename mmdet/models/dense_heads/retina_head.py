@@ -1,4 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from copy import deepcopy
+
 import torch.nn as nn
 from mmcv.cnn import ConvModule
 
@@ -41,12 +43,8 @@ class RetinaHead(AnchorHead):
                  init_cfg=dict(
                      type='Normal',
                      layer='Conv2d',
-                     std=0.01,
-                     override=dict(
-                         type='Normal',
-                         name='retina_cls',
-                         std=0.01,
-                         bias_prob=0.01)),
+                     std=0.01),
+                 retina_cls=dict(type='ConvClassPredictor', kernel_size=3, padding=1),
                  **kwargs):
         assert stacked_convs >= 0, \
             '`stacked_convs` must be non-negative integers, ' \
@@ -54,6 +52,7 @@ class RetinaHead(AnchorHead):
         self.stacked_convs = stacked_convs
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
+        self.retina_cls = retina_cls
         super(RetinaHead, self).__init__(
             num_classes,
             in_channels,
@@ -87,11 +86,12 @@ class RetinaHead(AnchorHead):
                     conv_cfg=self.conv_cfg,
                     norm_cfg=self.norm_cfg))
             in_channels = self.feat_channels
-        self.retina_cls = nn.Conv2d(
-            in_channels,
-            self.num_base_priors * self.cls_out_channels,
-            3,
-            padding=1)
+
+        self.retina_cls = deepcopy(self.retina_cls)
+        self.retina_cls.update({'in_channels': in_channels,
+                           'num_base_priors': self.num_base_priors,
+                           'cls_out_channels': self.cls_out_channels})
+        self.retina_cls = MODELS.build(self.retina_cls)
         reg_dim = self.bbox_coder.encode_size
         self.retina_reg = nn.Conv2d(
             in_channels, self.num_base_priors * reg_dim, 3, padding=1)
