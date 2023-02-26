@@ -27,8 +27,8 @@ class ConvClassPredictor(BaseModule):
 @MODELS.register_module()
 class ClipConvClassPredictor(BaseModule):
     def __init__(self, in_channels, num_base_priors, cls_out_channels,
-                 norm_text=True, norm_image=True, scale_and_bias=False,
-                 init_cfg=dict(type='Normal', layer='Conv2d', std=0.01, bias_prob=0.01)):
+                 norm_text=True, norm_image=False, scale=1.0, bias_prob=0.01,
+                 init_cfg=dict(type='Normal', layer='Conv2d', std=0.01)):
         super().__init__(init_cfg=init_cfg)
 
         with torch.no_grad():
@@ -53,13 +53,14 @@ class ClipConvClassPredictor(BaseModule):
         self.pred.weight.requires_grad = False
         self.norm_image = norm_image
 
-        if scale_and_bias:
-            with torch.no_grad():
-                self.scale = nn.Parameter(10 * torch.ones((1, )))
-                self.bias = nn.Parameter(bias_init_with_prob(0.01) * torch.ones((1, )))
-        else:
-            self.scale = None
-            self.bias = None
+        self.scale = None
+        self.bias = None
+        with torch.no_grad():
+            if scale is not None:
+                self.scale = nn.Parameter(scale * torch.ones((1, )))
+
+            if bias_prob is not None:
+                self.bias = nn.Parameter(bias_init_with_prob(bias_prob) * torch.ones((1, )))
 
     def forward(self, tensor):
         tensor = self.proj(tensor)
@@ -68,7 +69,9 @@ class ClipConvClassPredictor(BaseModule):
 
         if self.norm_image:
             tensor = tensor / tensor.norm(p=2, dim=-1, keepdim=True)
+
         tensor = self.pred(tensor)
+
         if self.scale is not None:
             tensor = tensor * self.scale
         if self.bias is not None:

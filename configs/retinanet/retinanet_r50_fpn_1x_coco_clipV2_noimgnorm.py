@@ -7,7 +7,7 @@ model = dict(
             type='ClipConvClassPredictor',
             norm_text=True,
             norm_image=False,
-            scale_and_bias=True
+            scale=1, bias_prob=0.01
         )
     )
 )
