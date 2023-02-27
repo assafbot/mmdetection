@@ -1,7 +1,7 @@
 # dataset settings
 _base_ = 'lvis_v0.5_instance.py'
 dataset_type = 'LVISV1Dataset'
-data_root = 'data/lvis_v1/'
+data_root = '/data/datasets/lvis/'
 
 train_dataloader = dict(
     dataset=dict(

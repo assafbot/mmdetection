@@ -1,6 +1,6 @@
 # dataset settings
 dataset_type = 'LVISV05Dataset'
-data_root = 'data/lvis_v0.5/'
+data_root = '/data/datasets/lvis/'
 
 # file_client_args = dict(
 #     backend='petrel',
