@@ -32,19 +32,11 @@ class ClipConvClassPredictor(BaseModule):
                  init_cfg=[dict(type='Normal', layer='Conv2d', std=0.01),
                            dict(type='Constant', layer='ScaleLayer', val=1, bias=bias_init_with_prob(0.01))]):
         super().__init__(init_cfg=init_cfg)
+        self.norm_image = norm_image
+        self.norm_text = norm_text
 
-        with torch.no_grad():
-            # TODO: @assaf support any dataset / dynamic input
-            class_names = CocoDataset.METAINFO['classes']
-
-            if open_clip is None:
-                raise ImportError('Please run "pip install open_clip_torch" to use ClipHead')
-            model, _, _ = open_clip.create_model_and_transforms('RN50x4', pretrained='openai')
-            tokenizer = open_clip.get_tokenizer('RN50x4')
-            class_embeddings = model.encode_text(tokenizer(class_names))
-            if norm_text:
-                class_embeddings = class_embeddings / class_embeddings.norm(p=2, dim=1, keepdim=True)
-            class_embeddings = torch.nn.Parameter(class_embeddings, requires_grad=False)
+        class_names = CocoDataset.METAINFO['classes']
+        class_embeddings = self._get_class_embeddings(class_names)
 
         num_classes, self.emb_dim = class_embeddings.shape
         assert num_classes == cls_out_channels
@@ -53,11 +45,20 @@ class ClipConvClassPredictor(BaseModule):
         with torch.no_grad():
             self.pred.weight[:] = class_embeddings
         self.pred.weight.requires_grad = False
-        self.norm_image = norm_image
         self.scale = ScaleLayer(scale=scale, bias=bias)
 
-    def init_weights(self):
-        super().init_weights()
+    def _get_class_embeddings(self, class_names):
+        with torch.no_grad():
+            # TODO: @assaf support any dataset / dynamic input
+            if open_clip is None:
+                raise ImportError('Please run "pip install open_clip_torch" to use ClipHead')
+            model, _, _ = open_clip.create_model_and_transforms('RN50x4', pretrained='openai')
+            tokenizer = open_clip.get_tokenizer('RN50x4')
+            class_embeddings = model.encode_text(tokenizer(class_names))
+            if self.norm_text:
+                class_embeddings = class_embeddings / class_embeddings.norm(p=2, dim=1, keepdim=True)
+            class_embeddings = torch.nn.Parameter(class_embeddings, requires_grad=False)
+        return class_embeddings
 
     def forward(self, tensor):
         tensor = self.proj(tensor)

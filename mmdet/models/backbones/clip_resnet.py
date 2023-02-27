@@ -1,8 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import logging
 
 import torch
-from mmengine.logging import MMLogger, print_log
 from mmengine.model import BaseModule, ModuleList
 from torch.nn.modules.batchnorm import _BatchNorm
 
