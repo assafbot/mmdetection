@@ -14,12 +14,12 @@ except ImportError:
 
 @MODELS.register_module()
 class ClipResNet(BaseModule):
-    def __init__(self, init_cfg=None, out_indices=None, frozen_stages=-1, norm_eval=True):
+    def __init__(self, model_name, pretrained=None, out_indices=None, frozen_stages=-1, norm_eval=True, init_cfg=None):
         super(ClipResNet, self).__init__(init_cfg)
         if open_clip is None:
             raise ImportError(f'Please run "pip install open_clip_torch" to use {self.__class__.__name__}')
 
-        model, _, _ = open_clip.create_model_and_transforms('RN50x4', pretrained='openai')
+        model = open_clip.create_model(model_name, pretrained)
         rn = model.visual
         stem = torch.nn.Sequential(rn.conv1, rn.bn1, rn.act1,
                                    rn.conv2, rn.bn2, rn.act2,
