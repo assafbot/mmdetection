@@ -16,7 +16,7 @@ model = dict(
         model_name='RN50',
         frozen_stages=1,
         norm_eval=True,
-        init_cfg=dict(type='Pretrained', checkpoint='RN50_openai.pth')
+        init_cfg=dict(type='Pretrained', checkpoint='mentee://mmdetection/pretrained/RN50_openai.pth')
     )
 )
 
