@@ -8,10 +8,7 @@ _base_ = [
 model = dict(
     bbox_head=dict(num_classes=1203),
     test_cfg=dict(
-        nms_pre=1000,
-        min_bbox_size=0,
-        score_thr=0.0001,
-        nms=dict(type='nms', iou_threshold=0.5),
+        score_thr=0.01,
         max_per_img=300))
 
 # optimizer
