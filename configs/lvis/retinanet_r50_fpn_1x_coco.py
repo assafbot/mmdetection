@@ -2,7 +2,7 @@ _base_ = [
     '../_base_/models/retinanet_r50_fpn.py',
     '../_base_/datasets/lvis_v1_instance.py',
     '../_base_/schedules/schedule_1x.py', '../_base_/default_runtime.py',
-    './retinanet_tta.py'
+    '../retinanet/retinanet_tta.py'
 ]
 
 model = dict(
