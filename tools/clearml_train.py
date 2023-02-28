@@ -21,9 +21,11 @@ def main():
     # args.config = task.connect_configuration(args.config)
 
     task.execute_remotely(queue_name=args.queue)
-    visible_devices = os.environ['CUDA_VISIBLE_DEVICES']
-    visible_devices_idx = list(map(int, visible_devices.split(',')))
-    port = 29600 + sum(map(lambda x: 2**x, visible_devices_idx))
+    visible_devices = os.environ.get('CUDA_VISIBLE_DEVICES', None)
+    port = 29600
+    if visible_devices is not None:
+        visible_devices_idx = list(map(int, visible_devices.split(',')))
+        port += sum(map(lambda x: 2**x, visible_devices_idx))
 
     print('CUDA_VISIBLE_DEVICES:', )
 
