@@ -3,6 +3,8 @@ import os
 
 import clearml
 
+from mmdet.apis import init_detector
+
 
 def main():
     parser = argparse.ArgumentParser(description='Train a detector')
@@ -11,6 +13,9 @@ def main():
     parser.add_argument('--project-name', help='clearml project name', default='mmdetection')
     parser.add_argument('--queue', help='clearml queue', default='default')
     args, unknownargs = parser.parse_known_args()
+
+    # Try to load config
+    init_detector(args.config, device='cpu')
 
     task_name = args.task_name or os.path.splitext(os.path.basename(args.config))[0]
     task = clearml.Task.init(project_name=args.project_name, task_name=task_name, output_uri='s3://mentee-vision/mmdetection/clearml/')
