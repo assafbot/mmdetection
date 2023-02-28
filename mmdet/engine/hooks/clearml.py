@@ -56,16 +56,19 @@ class ClearMLCheckpointHook(CheckpointHook):
         Args:
             runner (Runner): The runner of the training process.
         """
+        super()._save_checkpoint(runner)
+        self._upload(runner)
+
+    @master_only
+    def _upload(self, runner):
         if self.by_epoch:
             ckpt_filename = self.filename_tmpl.format(runner.epoch + 1)
         else:
             ckpt_filename = self.filename_tmpl.format(runner.iter + 1)
 
-        super()._save_checkpoint(runner)
-
         if os.path.isdir(self.out_dir):
             out_file = os.path.join(self.out_dir, ckpt_filename)
-            assert os.path.isfile(out_file)
+            assert os.path.isfile(out_file), f'{out_file} does not exist'
 
             if self.task is None:
                 self.task = self.clearml.Task.current_task()
