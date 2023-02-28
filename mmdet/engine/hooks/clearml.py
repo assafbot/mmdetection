@@ -29,4 +29,5 @@ class ClearMLLoggerHook(Hook):
             task_kwargs['task_name'] = runner.experiment_name
         assert 'task_type' not in task_kwargs
         task_kwargs['task_type'] = self.task_type
-        self.task = self.clearml.Task.init(**task_kwargs)
+        self.task = self.clearml.Task.current_task()
+

@@ -8,3 +8,5 @@ transformers
 open_clip_torch
 future
 tensorboard
+clearml
+boto3

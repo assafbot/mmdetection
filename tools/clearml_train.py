@@ -1,6 +1,7 @@
-import clearml
 import argparse
 import os
+
+import clearml
 
 
 def main():
@@ -20,12 +21,18 @@ def main():
     # args.config = task.connect_configuration(args.config)
 
     task.execute_remotely(queue_name=args.queue)
+    visible_devices = os.environ['CUDA_VISIBLE_DEVICES']
+    visible_devices_idx = list(map(int, visible_devices.split(',')))
+    port = 29600 + sum(map(lambda x: 2**x, visible_devices_idx))
+
+    print('CUDA_VISIBLE_DEVICES:', )
 
     tools_dir = os.path.dirname(__file__)
     dist_script = os.path.join(tools_dir, 'dist_train.sh')
-    cmd = f'{dist_script} {args.config} ' + unknownargs
+    cmd = f'PORT={port} {dist_script} {args.config} ' + unknownargs
     print(f'Executing: {cmd}')
-    os.system(cmd)
+    failed = os.system(cmd)
+    assert not failed
 
 
 if __name__ == '__main__':
