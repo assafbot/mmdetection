@@ -19,7 +19,7 @@ Progress on object detection is enabled by datasets that focus the research comm
 - Run following scripts to install our forked lvis-api.
 
   ```shell
-  pip install git+https://github.com/lvis-dataset/lvis-api.git
+  pip install git+https://github.com/assafbot/lvis-api.git
   ```
 
 - All experiments use oversample strategy [here](../../docs/tutorials/customize_dataset.md#class-balanced-dataset) with oversample threshold `1e-3`.

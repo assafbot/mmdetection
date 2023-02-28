@@ -1,6 +1,6 @@
-_base_ = [
-    './retinanet_r50_fpn_1x_lvis-v1.py'
-]
+from mmengine.model import bias_init_with_prob
+
+_base_ = './retinanet_r50_fpn_1x_lvis.py'
 
 # model settings
 model = dict(

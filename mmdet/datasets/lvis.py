@@ -278,12 +278,12 @@ class LVISV05Dataset(CocoDataset):
             import lvis
             if getattr(lvis, '__version__', '0') >= '10.5.3':
                 warnings.warn(
-                    'mmlvis is deprecated, please install official lvis-api by "pip install git+https://github.com/lvis-dataset/lvis-api.git"',  # noqa: E501
+                    'mmlvis is deprecated, please install official lvis-api by "pip install git+https://github.com/assafbot/lvis-api.git"',  # noqa: E501
                     UserWarning)
             from lvis import LVIS
         except ImportError:
             raise ImportError(
-                'Package lvis is not installed. Please run "pip install git+https://github.com/lvis-dataset/lvis-api.git".'  # noqa: E501
+                'Package lvis is not installed. Please run "pip install git+https://github.com/assafbot/lvis-api.git".'  # noqa: E501
             )
         with self.file_client.get_local_path(self.ann_file) as local_path:
             self.lvis = LVIS(local_path)
@@ -590,12 +590,12 @@ class LVISV1Dataset(LVISDataset):
             import lvis
             if getattr(lvis, '__version__', '0') >= '10.5.3':
                 warnings.warn(
-                    'mmlvis is deprecated, please install official lvis-api by "pip install git+https://github.com/lvis-dataset/lvis-api.git"',  # noqa: E501
+                    'mmlvis is deprecated, please install official lvis-api by "pip install git+https://github.com/assafbot/lvis-api.git"',  # noqa: E501
                     UserWarning)
             from lvis import LVIS
         except ImportError:
             raise ImportError(
-                'Package lvis is not installed. Please run "pip install git+https://github.com/lvis-dataset/lvis-api.git".'  # noqa: E501
+                'Package lvis is not installed. Please run "pip install git+https://github.com/assafbot/lvis-api.git".'  # noqa: E501
             )
         self.lvis = LVIS(self.ann_file)
         self.cat_ids = self.lvis.get_cat_ids()

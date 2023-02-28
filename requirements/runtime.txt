@@ -10,3 +10,4 @@ future
 tensorboard
 clearml
 boto3
+git+https://github.com/assafbot/lvis-api.git
