@@ -24,7 +24,6 @@ load_from = None
 resume = False
 
 custom_hooks = [
-    dict(type='ClearMLLoggerHook', init_kwargs=dict(output_uri='s3://mentee-vision/mmdetection/clearml/')),
     dict(type='NumClassCheckHook'),
     dict(type='CheckInvalidLossHook', interval=50, priority='VERY_LOW'),
 ]
