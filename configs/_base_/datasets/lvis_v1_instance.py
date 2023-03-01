@@ -1,5 +1,5 @@
 # dataset settings
-_base_ = 'lvis_v0.5_detection.py'
+_base_ = 'lvis_v0.5_instance.py'
 dataset_type = 'LVISV1Dataset'
 data_root = '/data/datasets/lvis/'
 
