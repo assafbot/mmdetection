@@ -4,7 +4,7 @@ _base_ = './retinanet_r50clip_fpn_1x_lvis-v1.py'
 model = dict(
     backbone=dict(
         model_name='RN50x4',
-        init_cfg=dict(type='Pretrained', checkpoint='mentee://mmdetection/pretrained/RN50_openai.pth')
+        init_cfg=dict(type='Pretrained', checkpoint='mentee://mmdetection/pretrained/RN50x4_openai.pth')
     ),
     neck=dict(
         _delete_=True,
