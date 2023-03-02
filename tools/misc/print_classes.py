@@ -1,15 +1,22 @@
 import argparse
 
 from mmengine.registry import init_default_scope
-from mmengine import Config, DATASETS
+from mmengine import Config
+
+from mmdet.registry import DATASETS
 
 
 def main(cfg):
     cfg = Config.fromfile(cfg)
     init_default_scope(cfg.get('default_scope', 'mmdet'))
     dataset = cfg.train_dataloader.dataset
-    dataset = DATASETS.build(dataset)
-    print(dataset.metainfo['classes'])
+
+    try:
+        dataset_class = DATASETS.get(dataset.type)
+        print(dataset_class.METAINFO['classes'])
+    except:
+        dataset = DATASETS.build(dataset)
+        print(dataset.metainfo['classes'])
 
 
 if __name__ == '__main__':

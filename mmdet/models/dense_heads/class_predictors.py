@@ -2,7 +2,6 @@ import torch
 from mmengine.model import BaseModule, bias_init_with_prob
 from torch import nn
 
-from mmdet.datasets import CocoDataset
 from mmdet.models.layers.scale import ScaleLayer
 from mmdet.registry import MODELS, DATASETS
 
@@ -28,7 +27,7 @@ class ConvClassPredictor(BaseModule):
 @MODELS.register_module()
 class ClipConvClassPredictor(BaseModule):
     def __init__(self, in_channels, num_base_priors, cls_out_channels,
-                 model_name=None, pretrained=None, dataset_name='CocoDataset',
+                 model_name=None, pretrained=None, dataset_name='CocoDataset', class_names=None,
                  norm_text=True, norm_image=False, scale=True, bias=True,
                  init_cfg=[dict(type='Normal', layer='Conv2d', std=0.01),
                            dict(type='Constant', layer='ScaleLayer', val=1, bias=bias_init_with_prob(0.01))]):
@@ -48,10 +47,8 @@ class ClipConvClassPredictor(BaseModule):
         self.scale = ScaleLayer(scale=scale, bias=bias)
 
         # TODO: @assaf support changing self.pred with a hook
-        dataset = DATASETS.get(dataset_name)
-        dataset.full_init()
-        class_names = dataset.METAINFO['classes']
-        self.pred = self._get_pred(class_names)
+        self.class_names = class_names or DATASETS.get(dataset_name).METAINFO['classes']
+        self.pred = self._get_pred(self.class_names)
 
     def _get_pred(self, class_names):
         class_embeddings = self._get_class_embeddings(class_names)
@@ -77,6 +74,12 @@ class ClipConvClassPredictor(BaseModule):
         return class_embeddings
 
     def forward(self, tensor):
+        # if not hasattr(self, 'once'):
+        #     # class_names = DATASETS.get('CocoDataset').METAINFO['classes']
+        #     class_names = ['pillow'] + [''] * 79
+        #     self.pred = self._get_pred(class_names)
+        #     self.once = True
+
         tensor = self.proj(tensor)
         n, c, h, w = tensor.shape
         tensor = tensor.permute(0, 2, 3, 1).reshape(n, h, w, -1, self.emb_dim)
