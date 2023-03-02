@@ -1,11 +1,13 @@
 import os
 
 import boto3
+from mmengine.dist import master_only, barrier
 from mmengine.runner import CheckpointLoader
 from mmengine.runner.checkpoint import load_from_local
 from tqdm import tqdm
 
 
+@master_only
 def _download(local_filename, bucket_name, object_key):
     s3 = boto3.client('s3')
     meta_data = s3.head_object(Bucket=bucket_name, Key=object_key)
@@ -29,4 +31,5 @@ def load_from_mentee(filename, map_location=None):
     if not os.path.isfile(local_filename):
         _download(local_filename, bucket_name, object_key)
 
+    barrier()
     return load_from_local(local_filename, map_location=map_location)
