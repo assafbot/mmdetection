@@ -11,6 +11,7 @@ model = dict(
             norm_image=True,
             model_name='RN50x4',
             pretrained='openai',
+            dataset_name='LVISV1Dataset',
             init_cfg=[dict(type='Normal', layer='Conv2d', std=0.01),
                       dict(type='Constant', layer='ScaleLayer', val=10, bias=bias_init_with_prob(0.01))]
         )
