@@ -5,6 +5,7 @@ _base_ = './retinanet_r50_fpn_1x_lvis-v1_clipV2_noimgnorm.py'
 # model settings
 model = dict(
     bbox_head=dict(
+        num_classes=1203,
         retina_cls=dict(
             norm_image=True,
             init_cfg=[dict(type='Normal', layer='Conv2d', std=0.01),

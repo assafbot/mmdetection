@@ -7,6 +7,7 @@ _base_ = [
 # model settings
 model = dict(
     bbox_head=dict(
+        num_classes=601,
         retina_cls=dict(
             type='ClipConvClassPredictor',
             norm_image=True,

@@ -5,6 +5,7 @@ _base_ = './retinanet_r50x4clip_fpn_1x_lvis-v1_frozen4.py'
 # model settings
 model = dict(
     bbox_head=dict(
+        num_classes=1203,
         retina_cls=dict(
             type='ClipConvClassPredictor',
             norm_image=True,
