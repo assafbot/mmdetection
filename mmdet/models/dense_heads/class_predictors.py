@@ -48,7 +48,9 @@ class ClipConvClassPredictor(BaseModule):
         self.scale = ScaleLayer(scale=scale, bias=bias)
 
         # TODO: @assaf support changing self.pred with a hook
-        class_names = DATASETS.get(dataset_name).METAINFO['classes']
+        dataset = DATASETS.get(dataset_name)
+        dataset.full_init()
+        class_names = dataset.METAINFO['classes']
         self.pred = self._get_pred(class_names)
 
     def _get_pred(self, class_names):
