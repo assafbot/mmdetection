@@ -1,6 +1,6 @@
 # dataset settings
 dataset_type = 'Objects365V2Dataset'
-data_root = 'data/Objects365/Obj365_v2/'
+data_root = '/data/datasets/objects365/'
 
 # file_client_args = dict(
 #     backend='petrel',
