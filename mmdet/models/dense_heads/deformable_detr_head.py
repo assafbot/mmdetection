@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple
 import torch
 import torch.nn as nn
 from mmcv.cnn import Linear
-from mmengine.model import bias_init_with_prob, constant_init
+from mmengine.model import bias_init_with_prob, constant_init, ModuleList
 from torch import Tensor
 
 from mmdet.registry import MODELS
@@ -61,12 +61,12 @@ class DeformableDETRHead(DETRHead):
         reg_branch = nn.Sequential(*reg_branch)
 
         if self.share_pred_layer:
-            self.cls_branches = nn.ModuleList(
+            self.cls_branches = ModuleList(
                 [fc_cls for _ in range(self.num_pred_layer)])
             self.reg_branches = nn.ModuleList(
                 [reg_branch for _ in range(self.num_pred_layer)])
         else:
-            self.cls_branches = nn.ModuleList(
+            self.cls_branches = ModuleList(
                 [copy.deepcopy(fc_cls) for _ in range(self.num_pred_layer)])
             self.reg_branches = nn.ModuleList([
                 copy.deepcopy(reg_branch) for _ in range(self.num_pred_layer)
@@ -74,6 +74,7 @@ class DeformableDETRHead(DETRHead):
 
     def init_weights(self) -> None:
         """Initialize weights of the Deformable DETR head."""
+        super().init_weights()
         if self.loss_cls.use_sigmoid:
             bias_init = bias_init_with_prob(0.01)
             for m in self.cls_branches:
