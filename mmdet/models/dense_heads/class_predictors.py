@@ -132,8 +132,9 @@ class ClipConvClassPredictor(AbstractClipClassPredictor):
 
 @MODELS.register_module()
 class ClipLinearClassPredictor(AbstractClipClassPredictor):
-    def __init__(self, embed_dims, cls_out_channels, **kwargs):
-        super().__init__(cls_out_channels=cls_out_channels, **kwargs)
+    def __init__(self, embed_dims, cls_out_channels,
+                 init_cfg=[dict(type='Constant', layer='ScaleLayer', val=1, bias=bias_init_with_prob(0.01))], **kwargs):
+        super().__init__(cls_out_channels=cls_out_channels, init_cfg=init_cfg, **kwargs)
         self.proj = nn.Linear(embed_dims, self.emb_dim)
 
     def forward(self, tensor):
