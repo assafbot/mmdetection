@@ -1,11 +1,18 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import collections
 import copy
+import random
 from typing import Sequence, Union
 
+import numpy as np
+import torch
+from mmcv.transforms.utils import cache_randomness
 from mmengine.dataset import BaseDataset, force_full_init
+from mmengine.model import stack_batch
+from mmengine.structures import InstanceData
 
 from mmdet.registry import DATASETS, TRANSFORMS
+from mmdet.structures import DetDataSample
 
 
 @DATASETS.register_module()
@@ -167,3 +174,88 @@ class MultiImageMixDataset:
             isinstance(skip_type_key, str) for skip_type_key in skip_type_keys
         ])
         self._skip_type_keys = skip_type_keys
+
+
+@DATASETS.register_module()
+class MixUpDataset:
+    def __init__(self, dataset, max_iters=15):
+        self.dataset = DATASETS.build(dataset)
+        self._fully_initialized = False
+        self.max_iters = max_iters
+
+    @property
+    def metainfo(self):
+        return copy.deepcopy(self.dataset.metainfo)
+
+    def __getitem__(self, item):
+        src = self.dataset[item]
+        trg = self.get_random_image(src)
+
+        alpha = np.random.beta(1.5, 1.5)
+        inputs = stack_batch([src['inputs'], trg['inputs']])
+        inputs = alpha * inputs[0] + (1-alpha) * inputs[1]
+
+        assert sorted(src.keys()) == ['data_samples', 'inputs']
+        assert sorted(trg.keys()) == ['data_samples', 'inputs']
+        assert sorted(src['data_samples'].keys()) == ['gt_instances', 'ignored_instances']
+        assert sorted(trg['data_samples'].keys()) == ['gt_instances', 'ignored_instances']
+
+        data_samples = DetDataSample()
+
+        src_gt_instances = src['data_samples'].gt_instances
+        trg_gt_instances = trg['data_samples'].gt_instances
+        src_gt_instances.alpha = torch.Tensor([alpha] * len(src_gt_instances))
+        trg_gt_instances.alpha = torch.Tensor([1-alpha] * len(trg_gt_instances))
+        data_samples.gt_instances = InstanceData.cat((src_gt_instances, trg_gt_instances))
+
+        src_ign_instances = src['data_samples'].ignored_instances
+        trg_ign_instances = trg['data_samples'].ignored_instances
+        src_ign_instances.alpha = torch.Tensor([alpha] * len(src_ign_instances))
+        trg_ign_instances.alpha = torch.Tensor([1-alpha] * len(trg_ign_instances))
+        data_samples.ignored_instances = InstanceData.cat((src_ign_instances, trg_ign_instances))
+
+        data_samples.set_metainfo({'img_shape': tuple(inputs.shape[1:])})
+
+        return {
+            'inputs': inputs,
+            'data_samples': data_samples
+        }
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def full_init(self):
+        """Loop to ``full_init`` each dataset."""
+        if self._fully_initialized:
+            return
+
+        self.dataset.full_init()
+        self._fully_initialized = True
+
+    @force_full_init
+    def get_data_info(self, idx: int) -> dict:
+        return self.dataset.get_data_info(idx)
+
+    @cache_randomness
+    def get_random_image(self, src) -> int:
+        src_shape = src['inputs'].shape
+        assert len(src_shape) == 3
+        src_ar = src_shape[1] / src_shape[2]
+
+        trg = []
+        for i in range(self.max_iters):
+            index = random.randint(0, len(self.dataset))
+            trg = self.dataset[index]
+
+            trg_shape = trg['inputs'].shape
+            assert len(trg_shape) == 3
+            trg_ar = trg_shape[1] / trg_shape[2]
+
+            if (trg_ar > 0) ^ (src_ar > 0):
+                continue
+
+            gt_bboxes_i = trg['data_samples'].gt_instances
+            if len(gt_bboxes_i) != 0:
+                break
+
+        return trg

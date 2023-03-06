@@ -15,6 +15,7 @@ from .multi_instance_assigner import MultiInstanceAssigner
 from .point_assigner import PointAssigner
 from .region_assigner import RegionAssigner
 from .sim_ota_assigner import SimOTAAssigner
+from .soft_iou_assigner import SoftIoUAssigner
 from .task_aligned_assigner import TaskAlignedAssigner
 from .uniform_assigner import UniformAssigner
 
@@ -22,7 +23,7 @@ __all__ = [
     'BaseAssigner', 'MaxIoUAssigner', 'ApproxMaxIoUAssigner', 'AssignResult',
     'PointAssigner', 'ATSSAssigner', 'CenterRegionAssigner', 'GridAssigner',
     'HungarianAssigner', 'RegionAssigner', 'UniformAssigner', 'SimOTAAssigner',
-    'TaskAlignedAssigner', 'BBoxL1Cost', 'ClassificationCost',
+    'TaskAlignedAssigner', 'BBoxL1Cost', 'ClassificationCost', 'SoftIoUAssigner',
     'CrossEntropyLossCost', 'DiceCost', 'FocalLossCost', 'IoUCost',
     'BboxOverlaps2D', 'DynamicSoftLabelAssigner', 'MultiInstanceAssigner'
 ]

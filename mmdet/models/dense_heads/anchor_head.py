@@ -263,9 +263,14 @@ class AnchorHead(BaseDenseHead):
         bbox_weights = anchors.new_zeros(num_valid_anchors, target_dim)
 
         # TODO: Considering saving memory, is it necessary to be long?
-        labels = anchors.new_full((num_valid_anchors, ),
-                                  self.num_classes,
-                                  dtype=torch.long)
+        if len(sampling_result.pos_gt_labels.shape) == 1:
+            labels = anchors.new_full((num_valid_anchors, ),
+                                      self.num_classes,
+                                      dtype=torch.long)
+        else:
+            labels = anchors.new_full((num_valid_anchors, sampling_result.pos_gt_labels.shape[1]),
+                                      0,
+                                      dtype=torch.float)
         label_weights = anchors.new_zeros(num_valid_anchors, dtype=torch.float)
 
         pos_inds = sampling_result.pos_inds
@@ -296,9 +301,8 @@ class AnchorHead(BaseDenseHead):
             num_total_anchors = flat_anchors.size(0)
             labels = unmap(
                 labels, num_total_anchors, inside_flags,
-                fill=self.num_classes)  # fill bg label
-            label_weights = unmap(label_weights, num_total_anchors,
-                                  inside_flags)
+                fill=self.num_classes if len(labels.shape) == 1 else 0)  # fill bg label
+            label_weights = unmap(label_weights, num_total_anchors, inside_flags)
             bbox_targets = unmap(bbox_targets, num_total_anchors, inside_flags)
             bbox_weights = unmap(bbox_weights, num_total_anchors, inside_flags)
 
@@ -440,7 +444,11 @@ class AnchorHead(BaseDenseHead):
             tuple: loss components.
         """
         # classification loss
-        labels = labels.reshape(-1)
+        if len(labels.shape) == 2:
+            labels = labels.reshape(-1)
+        else:
+            labels = labels.reshape(-1, labels.shape[-1])
+
         label_weights = label_weights.reshape(-1)
         cls_score = cls_score.permute(0, 2, 3,
                                       1).reshape(-1, self.cls_out_channels)
