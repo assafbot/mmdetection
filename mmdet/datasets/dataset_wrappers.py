@@ -244,7 +244,7 @@ class MixUpDataset:
 
         trg = []
         for i in range(self.max_iters):
-            index = random.randint(0, len(self.dataset))
+            index = random.randint(0, len(self.dataset)-1)
             trg = self.dataset[index]
 
             trg_shape = trg['inputs'].shape
