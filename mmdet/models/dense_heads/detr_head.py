@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import copy
 from typing import Dict, List, Tuple
 
 import torch
@@ -71,6 +72,7 @@ class DETRHead(BaseModule):
                         dict(type='IoUCost', iou_mode='giou', weight=2.0)
                     ])),
             test_cfg: ConfigType = dict(max_per_img=100),
+            fc_cls=dict(type='LinearClassPredictor'),
             init_cfg: OptMultiConfig = None) -> None:
         super().__init__(init_cfg=init_cfg)
         self.bg_cls_weight = 0
@@ -109,6 +111,7 @@ class DETRHead(BaseModule):
         self.loss_cls = MODELS.build(loss_cls)
         self.loss_bbox = MODELS.build(loss_bbox)
         self.loss_iou = MODELS.build(loss_iou)
+        self.fc_cls = fc_cls
 
         if self.loss_cls.use_sigmoid:
             self.cls_out_channels = num_classes
@@ -120,7 +123,9 @@ class DETRHead(BaseModule):
     def _init_layers(self) -> None:
         """Initialize layers of the transformer head."""
         # cls branch
-        self.fc_cls = Linear(self.embed_dims, self.cls_out_channels)
+        self.fc_cls = copy.deepcopy(self.fc_cls)
+        self.fc_cls.update({'embed_dims': self.embed_dims, 'cls_out_channels': self.cls_out_channels})
+        self.fc_cls = MODELS.build(self.fc_cls)
         # reg branch
         self.activate = nn.ReLU()
         self.reg_ffn = FFN(

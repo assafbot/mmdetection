@@ -11,6 +11,7 @@ from torch import Tensor
 from mmdet.registry import MODELS
 from mmdet.structures import SampleList
 from mmdet.utils import InstanceList, OptInstanceList
+from .class_predictors import LinearClassPredictor
 from ..layers import inverse_sigmoid
 from .detr_head import DETRHead
 
@@ -49,7 +50,9 @@ class DeformableDETRHead(DETRHead):
 
     def _init_layers(self) -> None:
         """Initialize classification branch and regression branch of head."""
-        fc_cls = Linear(self.embed_dims, self.cls_out_channels)
+        fc_cls = copy.deepcopy(self.fc_cls)
+        fc_cls.update({'embed_dims': self.embed_dims, 'cls_out_channels': self.cls_out_channels})
+        fc_cls = MODELS.build(fc_cls)
         reg_branch = []
         for _ in range(self.num_reg_fcs):
             reg_branch.append(Linear(self.embed_dims, self.embed_dims))
@@ -74,7 +77,8 @@ class DeformableDETRHead(DETRHead):
         if self.loss_cls.use_sigmoid:
             bias_init = bias_init_with_prob(0.01)
             for m in self.cls_branches:
-                nn.init.constant_(m.bias, bias_init)
+                if isinstance(m, LinearClassPredictor):
+                    nn.init.constant_(m.pred.bias, bias_init)
         for m in self.reg_branches:
             constant_init(m[-1], 0, bias=0)
         nn.init.constant_(self.reg_branches[0][-1].bias.data[2:], -2.0)

@@ -25,16 +25,25 @@ class ConvClassPredictor(BaseModule):
 
 
 @MODELS.register_module()
-class ClipConvClassPredictor(BaseModule):
-    def __init__(self, in_channels, num_base_priors, cls_out_channels,
-                 model_name=None, pretrained=None, dataset_name='CocoDataset', class_names=None,
-                 norm_text=True, norm_image=False, scale=True, bias=True,
-                 init_cfg=[dict(type='Normal', layer='Conv2d', std=0.01),
-                           dict(type='Constant', layer='ScaleLayer', val=1, bias=bias_init_with_prob(0.01))]):
+class LinearClassPredictor(BaseModule):
+    def __init__(self, embed_dims, cls_out_channels, init_cfg=None):
         super().__init__(init_cfg=init_cfg)
+        self.pred = nn.Linear(embed_dims, cls_out_channels)
+
+    def forward(self, tensor):
+        return self.pred(tensor)
+
+
+class AbstractClipClassPredictor(BaseModule):
+    def __init__(self, cls_out_channels,
+                 model_name=None, pretrained=None, dataset_name='CocoDataset', class_names=None,
+                 norm_text=True, norm_image=False, scale=True, bias=True, templates=['{}'], reduction='avg', **kwargs):
+        super().__init__(**kwargs)
+        self.cls_out_channels = cls_out_channels
         self.norm_image = norm_image
         self.norm_text = norm_text
-        self.cls_out_channels = cls_out_channels
+        self.templates = templates
+        self.reduction = reduction
 
         if model_name is None or pretrained is None:
             raise ValueError(f'model_name and pretrained must be specified for {self.__class__.__name__}')
@@ -43,7 +52,6 @@ class ClipConvClassPredictor(BaseModule):
         self.tokenizer = open_clip.get_tokenizer(model_name)
         self.emb_dim = self.model[0].text_projection.shape[1]
 
-        self.proj = nn.Conv2d(in_channels, num_base_priors * self.emb_dim, 3, padding=1)
         self.scale = ScaleLayer(scale=scale, bias=bias)
 
         # TODO: @assaf support changing self.pred with a hook
@@ -52,9 +60,9 @@ class ClipConvClassPredictor(BaseModule):
 
     def _get_pred(self, class_names):
         class_embeddings = self._get_class_embeddings(class_names)
-        num_classes = class_embeddings.shape[0]
+        num_classes = class_embeddings.shape[0] // len(self.templates)
         assert num_classes == self.cls_out_channels, 'mismatch between expected output size and number of classes'
-        pred = nn.Linear(self.emb_dim, num_classes, bias=False)
+        pred = nn.Linear(self.emb_dim, class_embeddings.shape[0], bias=False)
         with torch.no_grad():
             pred.weight[:] = class_embeddings
         pred.weight.requires_grad = False
@@ -66,18 +74,45 @@ class ClipConvClassPredictor(BaseModule):
             if open_clip is None:
                 raise ImportError('Please run "pip install open_clip_torch" to use ClipHead')
 
-            class_embeddings = self.model[0].encode_text(self.tokenizer(class_names))
+            texts = [template.format(class_name) for template in self.templates for class_name in class_names]
+            class_embeddings = self.model[0].encode_text(self.tokenizer(texts))
             if self.norm_text:
                 class_embeddings = class_embeddings / class_embeddings.norm(p=2, dim=1, keepdim=True)
             class_embeddings = torch.nn.Parameter(class_embeddings, requires_grad=False)
 
         return class_embeddings
 
+    def reduce(self, tensor):
+        tensor = tensor.reshape(tensor.shape[:-1] + (len(self.templates), -1))
+        if self.reduction == 'max':
+            tensor, _ = tensor.max(-2)
+        elif self.reduction == 'avg':
+            tensor = tensor.mean(-2)
+        else:
+            raise NotImplementedError(f'Unknown reduction: {self.reduction}')
+        return tensor
+
+
+@MODELS.register_module()
+class ClipConvClassPredictor(AbstractClipClassPredictor):
+    def __init__(self, in_channels, num_base_priors, cls_out_channels,
+                 init_cfg=[dict(type='Normal', layer='Conv2d', std=0.01),
+                           dict(type='Constant', layer='ScaleLayer', val=1, bias=bias_init_with_prob(0.01))], **kwargs):
+        super().__init__(cls_out_channels=cls_out_channels, init_cfg=init_cfg, **kwargs)
+        self.proj = nn.Conv2d(in_channels, num_base_priors * self.emb_dim, 3, padding=1)
+
     def forward(self, tensor):
-        # if not hasattr(self, 'once'):
+        # if not hasattr(self, 'once') or not self.once:
         #     # class_names = DATASETS.get('CocoDataset').METAINFO['classes']
-        #     class_names = ['pillow'] + [''] * 79
-        #     self.pred = self._get_pred(class_names)
+        #     self.reduction = 'max'
+        #     self.templates = ['{}', 'a close-up photo of a {}.', 'a photo of the {}.', 'a photo of one {}.', 'a photo of a {}.',
+        #         'a photo of a small {}.', 'a photo of a large {}.', 'a photo of the small {}.', 'a photo of the large {}.']
+        #     # self.templates = ['{}', 'a photo of a {}.']
+        #     self.class_names = ['screen']  # * self.cls_out_channels
+        #     self.class_names += [''] * (self.cls_out_channels - len(self.class_names))
+        #     print('Recomputing class names embeddings...', end='')
+        #     self.pred = self._get_pred(self.class_names)
+        #     print(' Done!')
         #     self.once = True
 
         tensor = self.proj(tensor)
@@ -89,6 +124,38 @@ class ClipConvClassPredictor(BaseModule):
 
         tensor = self.pred(tensor)
         tensor = self.scale(tensor)
+        tensor = self.reduce(tensor)
 
         tensor = tensor.reshape(n, h, w, -1).permute(0, 3, 1, 2)
+        return tensor
+
+
+@MODELS.register_module()
+class ClipLinearClassPredictor(AbstractClipClassPredictor):
+    def __init__(self, embed_dims, cls_out_channels, **kwargs):
+        super().__init__(cls_out_channels=cls_out_channels, **kwargs)
+        self.proj = nn.Linear(embed_dims, self.emb_dim)
+
+    def forward(self, tensor):
+        # if not hasattr(self, 'once') or not self.once:
+        #     # class_names = DATASETS.get('CocoDataset').METAINFO['classes']
+        #     self.reduction = 'max'
+        #     self.templates = ['{}', 'a close-up photo of a {}.', 'a photo of the {}.', 'a photo of one {}.', 'a photo of a {}.',
+        #         'a photo of a small {}.', 'a photo of a large {}.', 'a photo of the small {}.', 'a photo of the large {}.']
+        #     # self.templates = ['{}', 'a photo of a {}.']
+        #     self.class_names = ['screen']  # * self.cls_out_channels
+        #     self.class_names += [''] * (self.cls_out_channels - len(self.class_names))
+        #     print('Recomputing class names embeddings...', end='')
+        #     self.pred = self._get_pred(self.class_names)
+        #     print(' Done!')
+        #     self.once = True
+
+        tensor = self.proj(tensor)
+        if self.norm_image:
+            tensor = tensor / tensor.norm(p=2, dim=-1, keepdim=True)
+
+        tensor = self.pred(tensor)
+        tensor = self.scale(tensor)
+        tensor = self.reduce(tensor)
+
         return tensor
