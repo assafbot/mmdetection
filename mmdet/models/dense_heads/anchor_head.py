@@ -275,12 +275,12 @@ class AnchorHead(BaseDenseHead):
                                       dtype=torch.float)
 
         if self.use_category_ids:
-            label_weights = anchors.new_zeros((num_valid_anchors, self.num_classes), dtype=torch.float)
-            class_weights = anchors.new_zeros(self.num_classes, dtype=torch.float)
+            label_weights = anchors.new_zeros((num_valid_anchors, self.num_classes), dtype=torch.uint8, requires_grad=False)
+            class_weights = anchors.new_zeros(self.num_classes, dtype=torch.uint8, requires_grad=False)
             valid_cat_ids = img_meta['pos_category_ids'] + img_meta['neg_category_ids']
             class_weights[valid_cat_ids] = 1
         else:
-            label_weights = anchors.new_zeros((num_valid_anchors,), dtype=torch.float)
+            label_weights = anchors.new_zeros((num_valid_anchors,), dtype=torch.float, requires_grad=False)
             class_weights = 1.0
 
         pos_inds = sampling_result.pos_inds
@@ -523,12 +523,14 @@ class AnchorHead(BaseDenseHead):
 
         anchor_list, valid_flag_list = self.get_anchors(
             featmap_sizes, batch_img_metas, device=device)
-        cls_reg_targets = self.get_targets(
-            anchor_list,
-            valid_flag_list,
-            batch_gt_instances,
-            batch_img_metas,
-            batch_gt_instances_ignore=batch_gt_instances_ignore)
+
+        with torch.no_grad():
+            cls_reg_targets = self.get_targets(
+                anchor_list,
+                valid_flag_list,
+                batch_gt_instances,
+                batch_img_metas,
+                batch_gt_instances_ignore=batch_gt_instances_ignore)
         (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
          avg_factor) = cls_reg_targets
 
