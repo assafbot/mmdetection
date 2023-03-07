@@ -273,13 +273,14 @@ class AnchorHead(BaseDenseHead):
             labels = anchors.new_full((num_valid_anchors, sampling_result.pos_gt_labels.shape[1]),
                                       0,
                                       dtype=torch.float)
-        label_weights = anchors.new_zeros((num_valid_anchors, self.num_classes), dtype=torch.float)
 
         if self.use_category_ids:
+            label_weights = anchors.new_zeros((num_valid_anchors, self.num_classes), dtype=torch.float)
             class_weights = anchors.new_zeros(self.num_classes, dtype=torch.float)
             valid_cat_ids = img_meta['pos_category_ids'] + img_meta['neg_category_ids']
             class_weights[valid_cat_ids] = 1
         else:
+            label_weights = anchors.new_zeros((num_valid_anchors,), dtype=torch.float)
             class_weights = 1.0
 
         pos_inds = sampling_result.pos_inds
@@ -299,13 +300,13 @@ class AnchorHead(BaseDenseHead):
 
             labels[pos_inds] = sampling_result.pos_gt_labels
             if self.train_cfg['pos_weight'] <= 0:
-                label_weights[pos_inds, :] = class_weights
+                label_weights[pos_inds] = class_weights
             else:
-                label_weights[pos_inds, :] = class_weights * self.train_cfg['pos_weight']
+                label_weights[pos_inds] = class_weights * self.train_cfg['pos_weight']
 
         # TODO: @assaf zero weight for negative samples with class in 'not_exhaustive_category_ids'
         if len(neg_inds) > 0:
-            label_weights[neg_inds, :] = class_weights
+            label_weights[neg_inds] = class_weights
 
         # map up to original set of anchors
         if unmap_outputs:
