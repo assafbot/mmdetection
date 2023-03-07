@@ -178,10 +178,11 @@ class MultiImageMixDataset:
 
 @DATASETS.register_module()
 class MixUpDataset:
-    def __init__(self, dataset, max_iters=15):
+    def __init__(self, dataset, max_iters=15, force_alpha=None):
         self.dataset = DATASETS.build(dataset)
         self._fully_initialized = False
         self.max_iters = max_iters
+        self.force_alpha = force_alpha
 
     @property
     def metainfo(self):
@@ -191,7 +192,7 @@ class MixUpDataset:
         src = self.dataset[item]
         trg = self.get_random_image(src)
 
-        alpha = np.random.beta(1.5, 1.5)
+        alpha = self.force_alpha or np.random.beta(1.5, 1.5)
         inputs = stack_batch([src['inputs'], trg['inputs']])
         inputs = alpha * inputs[0] + (1-alpha) * inputs[1]
 

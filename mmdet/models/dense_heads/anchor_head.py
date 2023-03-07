@@ -63,6 +63,7 @@ class AnchorHead(BaseDenseHead):
             type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0),
         train_cfg: OptConfigType = None,
         test_cfg: OptConfigType = None,
+        use_category_ids: bool = False,
         init_cfg: OptMultiConfig = dict(
             type='Normal', layer='Conv2d', std=0.01)
     ) -> None:
@@ -94,6 +95,7 @@ class AnchorHead(BaseDenseHead):
                 self.sampler = PseudoSampler(context=self)
 
         self.fp16_enabled = False
+        self.use_category_ids = use_category_ids
 
         self.prior_generator = TASK_UTILS.build(anchor_generator)
 
@@ -271,7 +273,14 @@ class AnchorHead(BaseDenseHead):
             labels = anchors.new_full((num_valid_anchors, sampling_result.pos_gt_labels.shape[1]),
                                       0,
                                       dtype=torch.float)
-        label_weights = anchors.new_zeros(num_valid_anchors, dtype=torch.float)
+        label_weights = anchors.new_zeros((num_valid_anchors, self.num_classes), dtype=torch.float)
+
+        if self.use_category_ids:
+            class_weights = anchors.new_zeros(self.num_classes, dtype=torch.float)
+            valid_cat_ids = img_meta['pos_category_ids'] + img_meta['neg_category_ids']
+            class_weights[valid_cat_ids] = 1
+        else:
+            class_weights = 1.0
 
         pos_inds = sampling_result.pos_inds
         neg_inds = sampling_result.neg_inds
@@ -290,11 +299,13 @@ class AnchorHead(BaseDenseHead):
 
             labels[pos_inds] = sampling_result.pos_gt_labels
             if self.train_cfg['pos_weight'] <= 0:
-                label_weights[pos_inds] = 1.0
+                label_weights[pos_inds, :] = class_weights
             else:
-                label_weights[pos_inds] = self.train_cfg['pos_weight']
+                label_weights[pos_inds, :] = class_weights * self.train_cfg['pos_weight']
+
+        # TODO: @assaf zero weight for negative samples with class in 'not_exhaustive_category_ids'
         if len(neg_inds) > 0:
-            label_weights[neg_inds] = 1.0
+            label_weights[neg_inds, :] = class_weights
 
         # map up to original set of anchors
         if unmap_outputs:
@@ -449,7 +460,11 @@ class AnchorHead(BaseDenseHead):
         else:
             labels = labels.reshape(-1, labels.shape[-1])
 
-        label_weights = label_weights.reshape(-1)
+        if len(label_weights.shape) == 2:
+            label_weights = label_weights.reshape(-1)
+        else:
+            label_weights = label_weights.reshape(-1, label_weights.shape[-1])
+
         cls_score = cls_score.permute(0, 2, 3,
                                       1).reshape(-1, self.cls_out_channels)
         loss_cls = self.loss_cls(

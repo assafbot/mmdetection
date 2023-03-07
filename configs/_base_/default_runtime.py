@@ -1,10 +1,13 @@
+import sys
+
 default_scope = 'mmdet'
+checkpoint_hook_type = 'ClearMLCheckpointHook' if not getattr(sys, 'gettrace', lambda: False)() else 'CheckpointHook'
 
 default_hooks = dict(
     timer=dict(type='IterTimerHook'),
     logger=dict(type='LoggerHook', interval=50),
     param_scheduler=dict(type='ParamSchedulerHook'),
-    checkpoint=dict(type='CheckpointHook', interval=1, filename_tmpl='epoch_{:03d}.pth'),  # ClearMLCheckpointHook
+    checkpoint=dict(type=checkpoint_hook_type, interval=1, filename_tmpl='epoch_{:03d}.pth'),
     sampler_seed=dict(type='DistSamplerSeedHook'),
     visualization=dict(type='DetVisualizationHook'))
 
@@ -24,7 +27,9 @@ load_from = None
 resume = False
 
 custom_hooks = [
-    # dict(type='ClearMLLoggerHook', init_kwargs=dict(output_uri='s3://mentee-vision/mmdetection/clearml/')),
     dict(type='NumClassCheckHook'),
     dict(type='CheckInvalidLossHook', interval=50, priority='VERY_LOW'),
 ]
+
+if not getattr(sys, 'gettrace', lambda: False)():
+    custom_hooks.append(dict(type='ClearMLLoggerHook', init_kwargs=dict(output_uri='s3://mentee-vision/mmdetection/clearml/')))
