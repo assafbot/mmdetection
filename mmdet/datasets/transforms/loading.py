@@ -897,7 +897,8 @@ class RemoveLVISRareLabels(BaseTransform):
         if len(instances) == 0:
             return results
 
-        keep = [instance['bbox_label_text'] not in LVISDataset.RARE_CLASSES for instance in instances]
+        classes = results['metainfo']['classes']
+        keep = [classes[instance['bbox_label']] not in LVISDataset.RARE_CLASSES for instance in instances]
         return _filter_results(results, keep)
 
     def __repr__(self):
@@ -910,7 +911,6 @@ class AddRandomNegatives(BaseTransform):
         self.num_classes = num_classes
         self.total = total
 
-    @autocast_box_type()
     def transform(self, results: dict) -> Union[dict, None]:
         needed = max(0, self.total - len(results['neg_category_ids']))
         rand_negs = np.random.randint(self.num_classes, size=self.total*2)

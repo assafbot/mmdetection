@@ -146,7 +146,8 @@ class DetDataPreprocessor(ImgDataPreprocessor):
             for batch_aug in self.batch_augments:
                 inputs, data_samples = batch_aug(inputs, data_samples)
 
-        return {'inputs': inputs, 'data_samples': data_samples}
+        data['inputs'], data['data_samples'] = inputs, data_samples
+        return data
 
     def _get_pad_shape(self, data: dict) -> List[tuple]:
         """Get the pad_shape of each image based on data and

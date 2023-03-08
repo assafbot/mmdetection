@@ -132,6 +132,8 @@ class CocoDataset(BaseDetDataset):
             data_info['not_exhaustive_category_ids'] = [
                 self.cat2label[i] for i in img_info['not_exhaustive_category_ids']]
 
+        data_info['metainfo'] = self._metainfo
+
         pos_category_ids = set()
 
         instances = []
@@ -158,7 +160,6 @@ class CocoDataset(BaseDetDataset):
             instance['bbox'] = bbox
             instance['bbox_category_id'] = ann['category_id']
             instance['bbox_label'] = self.cat2label[ann['category_id']]
-            instance['bbox_label_text'] = self._metainfo['classes'][instance['bbox_label']]
             pos_category_ids.add(instance['bbox_label'])
 
             if ann.get('segmentation', None):
