@@ -1,3 +1,5 @@
+import re
+
 import torch
 from mmengine.model import BaseModule, bias_init_with_prob
 from torch import nn
@@ -10,6 +12,18 @@ try:
 except ImportError:
     open_clip = None
 
+
+def _canonicalize(class_names):
+    new_class_names = []
+    for class_name in class_names:
+        class_name = class_name.lower()
+        class_name = re.sub(f'[^a-z0-9- ]', ' ', class_name)
+        class_name = re.sub(r'\s+', ' ', class_name)
+        class_name = re.sub(r'-+', '-', class_name)
+        class_name = class_name.strip()
+        new_class_names.append(class_name)
+
+    return new_class_names
 
 @MODELS.register_module()
 class ConvClassPredictor(BaseModule):
@@ -36,7 +50,7 @@ class LinearClassPredictor(BaseModule):
 
 class AbstractClipClassPredictor(BaseModule):
     def __init__(self, cls_out_channels,
-                 model_name=None, pretrained=None, dataset_name='CocoDataset', class_names=None,
+                 model_name=None, pretrained=None, dataset_name='CocoDataset', class_names=None, canonicalize_text_labels=False,
                  norm_text=True, norm_image=False, scale=True, bias=True, templates=['{}'], reduction='avg', **kwargs):
         super().__init__(**kwargs)
         self.cls_out_channels = cls_out_channels
@@ -44,6 +58,7 @@ class AbstractClipClassPredictor(BaseModule):
         self.norm_text = norm_text
         self.templates = templates
         self.reduction = reduction
+        self.canonicalize_text_labels = canonicalize_text_labels
 
         if model_name is None or pretrained is None:
             raise ValueError(f'model_name and pretrained must be specified for {self.__class__.__name__}')
@@ -69,6 +84,9 @@ class AbstractClipClassPredictor(BaseModule):
         return pred
 
     def _get_class_embeddings(self, class_names):
+        if self.canonicalize_text_labels:
+            class_names = _canonicalize(class_names)
+
         with torch.no_grad():
             # TODO: @assaf support any dataset / dynamic input
             if open_clip is None:

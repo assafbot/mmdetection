@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from collections import deque
 from typing import Optional, Tuple, Union
 
 import mmcv
@@ -11,10 +12,26 @@ from mmcv.transforms import LoadImageFromFile
 from mmengine.fileio import FileClient
 from mmengine.structures import BaseDataElement
 
+from mmdet.datasets import LVISDataset
 from mmdet.registry import TRANSFORMS
 from mmdet.structures.bbox import get_box_type
 from mmdet.structures.bbox.box_type import autocast_box_type
 from mmdet.structures.mask import BitmapMasks, PolygonMasks
+
+INSTANCE_KEYS = ('gt_bboxes', 'gt_bboxes_labels', 'gt_masks', 'gt_ignore_flags', 'instances')
+
+
+def _filter_results(results, keep):
+    l = len(results[INSTANCE_KEYS[0]])
+    for key in INSTANCE_KEYS:
+        if key in results:
+            assert len(results[key]) == l
+            if isinstance(results[key], list):
+                results[key] = [x for x, k in zip(results[key], keep) if k]
+            else:
+                results[key] = results[key][keep]
+
+    return results
 
 
 @TRANSFORMS.register_module()
@@ -737,12 +754,7 @@ class FilterAnnotations(BaseTransform):
             if self.keep_empty:
                 return None
 
-        keys = ('gt_bboxes', 'gt_bboxes_labels', 'gt_masks', 'gt_ignore_flags')
-        for key in keys:
-            if key in results:
-                results[key] = results[key][keep]
-
-        return results
+        return _filter_results(results, keep)
 
     def __repr__(self):
         return self.__class__.__name__ + \
@@ -874,3 +886,36 @@ class InferencerLoader(BaseTransform):
         if 'img' in inputs:
             return self.from_ndarray(inputs)
         return self.from_file(inputs)
+
+
+@TRANSFORMS.register_module()
+class RemoveLVISRareLabels(BaseTransform):
+    @autocast_box_type()
+    def transform(self, results: dict) -> Union[dict, None]:
+        assert 'instances' in results
+        instances = results['instances']
+        if len(instances) == 0:
+            return results
+
+        keep = [instance['bbox_label_text'] not in LVISDataset.RARE_CLASSES for instance in instances]
+        return _filter_results(results, keep)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '()'
+
+
+@TRANSFORMS.register_module()
+class AddRandomNegatives(BaseTransform):
+    def __init__(self, num_classes, total=50):
+        self.num_classes = num_classes
+        self.total = total
+
+    @autocast_box_type()
+    def transform(self, results: dict) -> Union[dict, None]:
+        needed = max(0, self.total - len(results['neg_category_ids']))
+        rand_negs = np.random.randint(self.num_classes, size=self.total*2)
+        rand_negs = [x for x in rand_negs if x not in results['pos_category_ids']]
+        results['neg_category_ids'].extend(rand_negs[:needed])
+
+    def __repr__(self):
+        return self.__class__.__name__ + f'(total={self.total})'

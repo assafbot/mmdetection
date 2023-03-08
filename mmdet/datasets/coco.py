@@ -156,7 +156,9 @@ class CocoDataset(BaseDetDataset):
             else:
                 instance['ignore_flag'] = 0
             instance['bbox'] = bbox
+            instance['bbox_category_id'] = ann['category_id']
             instance['bbox_label'] = self.cat2label[ann['category_id']]
+            instance['bbox_label_text'] = self._metainfo['classes'][instance['bbox_label']]
             pos_category_ids.add(instance['bbox_label'])
 
             if ann.get('segmentation', None):
