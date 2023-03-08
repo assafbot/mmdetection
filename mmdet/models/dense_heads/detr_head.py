@@ -126,7 +126,7 @@ class DETRHead(BaseModule):
         """Initialize layers of the transformer head."""
         # cls branch
         self.fc_cls = copy.deepcopy(self.fc_cls)
-        self.fc_cls.update({'embed_dims': self.embed_dims, 'cls_out_channels': self.cls_out_channels})
+        self.fc_cls.update({'in_channels': self.embed_dims, 'out_channels': self.cls_out_channels})
         self.fc_cls = MODELS.build(self.fc_cls)
         # reg branch
         self.activate = nn.ReLU()

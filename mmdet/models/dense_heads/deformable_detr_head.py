@@ -51,7 +51,7 @@ class DeformableDETRHead(DETRHead):
     def _init_layers(self) -> None:
         """Initialize classification branch and regression branch of head."""
         fc_cls = copy.deepcopy(self.fc_cls)
-        fc_cls.update({'embed_dims': self.embed_dims, 'cls_out_channels': self.cls_out_channels})
+        fc_cls.update({'in_channels': self.embed_dims, 'out_channels': self.cls_out_channels})
         fc_cls = MODELS.build(fc_cls)
         reg_branch = []
         for _ in range(self.num_reg_fcs):

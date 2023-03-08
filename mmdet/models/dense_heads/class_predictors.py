@@ -27,13 +27,14 @@ def _canonicalize(class_names):
 
     return new_class_names
 
+
 @MODELS.register_module()
 class ConvClassPredictor(BaseModule):
-    def __init__(self, in_channels, num_base_priors, cls_out_channels,
+    def __init__(self, in_channels, num_base_priors, out_channels,
                  kernel_size=1, padding=0,
                  init_cfg=dict(type='Normal', layer='Conv2d', std=0.01, bias_prob=0.01)):
         super().__init__(init_cfg=init_cfg)
-        self.conv = nn.Conv2d(in_channels, num_base_priors * cls_out_channels,
+        self.conv = nn.Conv2d(in_channels, num_base_priors * out_channels,
                               kernel_size=kernel_size, padding=padding)
 
     def forward(self, tensor):
@@ -42,9 +43,9 @@ class ConvClassPredictor(BaseModule):
 
 @MODELS.register_module()
 class LinearClassPredictor(BaseModule):
-    def __init__(self, embed_dims, cls_out_channels, init_cfg=None):
+    def __init__(self, in_channels, out_channels, init_cfg=None):
         super().__init__(init_cfg=init_cfg)
-        self.pred = nn.Linear(embed_dims, cls_out_channels)
+        self.pred = nn.Linear(in_channels, out_channels)
 
     def forward(self, tensor):
         return self.pred(tensor)
@@ -55,12 +56,12 @@ def _add_random_template(class_name):
 
 
 class AbstractClipClassPredictor(BaseModule):
-    def __init__(self, cls_out_channels,
+    def __init__(self, in_channels, out_channels,
                  model_name=None, pretrained=None, dataset_name='CocoDataset', class_names=None, canonicalize_text_labels=False,
-                 norm_text=True, norm_image=False, scale=True, bias=True, templates=['{}'], reduction='avg', random_template=False,
+                 norm_text=True, norm_image=False, scale=True, bias=True, scale_with_input=False, templates=['{}'], reduction='avg', random_template=False,
                  **kwargs):
         super().__init__(**kwargs)
-        self.cls_out_channels = cls_out_channels
+        self.out_channels = out_channels
         self.norm_image = norm_image
         self.norm_text = norm_text
         self.templates = templates
@@ -76,7 +77,7 @@ class AbstractClipClassPredictor(BaseModule):
         self.tokenizer = open_clip.get_tokenizer(model_name)
         self.emb_dim = self.model[0].text_projection.shape[1]
 
-        self.scale = ScaleLayer(scale=scale, bias=bias)
+        self.scale = ScaleLayer(scale=scale, bias=bias, use_input=scale_with_input, in_channels=in_channels)
 
         # TODO: @assaf support changing self.pred with a hook
         self.class_names = class_names or DATASETS.get(dataset_name).METAINFO['classes']
@@ -90,7 +91,7 @@ class AbstractClipClassPredictor(BaseModule):
         with torch.no_grad():
             class_embeddings = self._get_class_embeddings(class_names)
             num_classes = class_embeddings.shape[0] // len(self.templates)
-            assert num_classes == self.cls_out_channels, 'mismatch between expected output size and number of classes'
+            assert num_classes == self.out_channels, 'mismatch between expected output size and number of classes'
             pred = nn.Linear(self.emb_dim, class_embeddings.shape[0], bias=False)
             pred.weight[:] = class_embeddings
             pred.weight.requires_grad = False
@@ -109,6 +110,7 @@ class AbstractClipClassPredictor(BaseModule):
 
             texts = [template.format(class_name) for template in self.templates for class_name in class_names]
             class_embeddings = self.model[0].encode_text(self.tokenizer(texts))
+
             if self.norm_text:
                 class_embeddings = class_embeddings / class_embeddings.norm(p=2, dim=1, keepdim=True)
             class_embeddings = torch.nn.Parameter(class_embeddings, requires_grad=False)
@@ -132,8 +134,8 @@ class AbstractClipClassPredictor(BaseModule):
         #     self.templates = ['{}', 'a close-up photo of a {}.', 'a photo of the {}.', 'a photo of one {}.', 'a photo of a {}.',
         #         'a photo of a small {}.', 'a photo of a large {}.', 'a photo of the small {}.', 'a photo of the large {}.']
         #     # self.templates = ['{}', 'a photo of a {}.']
-        #     self.class_names = ['screen']  # * self.cls_out_channels
-        #     self.class_names += [''] * (self.cls_out_channels - len(self.class_names))
+        #     self.class_names = ['screen']  # * self.out_channels
+        #     self.class_names += [''] * (self.out_channels - len(self.class_names))
         #     print('Recomputing class names embeddings...', end='')
         #     self.pred = self._get_pred(self.class_names)
         #     print(' Done!')
@@ -150,45 +152,44 @@ class AbstractClipClassPredictor(BaseModule):
         raise NotImplementedError()
 
 
-
 @MODELS.register_module()
 class ClipConvClassPredictor(AbstractClipClassPredictor):
-    def __init__(self, in_channels, num_base_priors, cls_out_channels,
+    def __init__(self, in_channels, num_base_priors, out_channels,
                  init_cfg=[dict(type='Normal', layer='Conv2d', std=0.01),
                            dict(type='Constant', layer='ScaleLayer', val=1, bias=bias_init_with_prob(0.01))], **kwargs):
-        super().__init__(cls_out_channels=cls_out_channels, init_cfg=init_cfg, **kwargs)
+        super().__init__(in_channels=in_channels, out_channels=out_channels, init_cfg=init_cfg, **kwargs)
         self.proj = nn.Conv2d(in_channels, num_base_priors * self.emb_dim, 3, padding=1)
 
-    def _forward(self, tensor):
-        tensor = self.proj(tensor)
-        n, c, h, w = tensor.shape
-        tensor = tensor.permute(0, 2, 3, 1).reshape(n, h, w, -1, self.emb_dim)
+    def _forward(self, x):
+        image_emb = self.proj(x)
+        n, c, h, w = image_emb.shape
+        image_emb = image_emb.permute(0, 2, 3, 1).reshape(n, h, w, -1, self.emb_dim)
 
         if self.norm_image:
-            tensor = tensor / tensor.norm(p=2, dim=-1, keepdim=True)
+            image_emb = image_emb / (image_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
 
-        tensor = self.pred(tensor)
-        tensor = self.scale(tensor)
-        tensor = self.reduce(tensor)
+        logits = self.pred(image_emb)
+        logits = self.scale(logits, x)
+        logits = self.reduce(logits)
 
-        tensor = tensor.reshape(n, h, w, -1).permute(0, 3, 1, 2)
-        return tensor
+        logits = logits.reshape(n, h, w, -1).permute(0, 3, 1, 2)
+        return logits
 
 
 @MODELS.register_module()
 class ClipLinearClassPredictor(AbstractClipClassPredictor):
-    def __init__(self, embed_dims, cls_out_channels,
+    def __init__(self, in_channels, out_channels,
                  init_cfg=[dict(type='Constant', layer='ScaleLayer', val=1, bias=bias_init_with_prob(0.01))], **kwargs):
-        super().__init__(cls_out_channels=cls_out_channels, init_cfg=init_cfg, **kwargs)
-        self.proj = nn.Linear(embed_dims, self.emb_dim)
+        super().__init__(in_channels=in_channels, out_channels=out_channels, init_cfg=init_cfg, **kwargs)
+        self.proj = nn.Linear(in_channels, self.emb_dim)
 
-    def _forward(self, tensor):
-        tensor = self.proj(tensor)
+    def _forward(self, x):
+        image_emb = self.proj(x)
         if self.norm_image:
-            tensor = tensor / tensor.norm(p=2, dim=-1, keepdim=True)
+            image_emb = image_emb / (image_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
 
-        tensor = self.pred(tensor)
-        tensor = self.scale(tensor)
-        tensor = self.reduce(tensor)
+        logits = self.pred(image_emb)
+        logits = self.scale(logits, x)
+        logits = self.reduce(logits)
 
-        return tensor
+        return logits

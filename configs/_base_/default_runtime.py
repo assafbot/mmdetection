@@ -2,10 +2,11 @@ import sys
 
 default_scope = 'mmdet'
 checkpoint_hook_type = 'ClearMLCheckpointHook' if not getattr(sys, 'gettrace', lambda: False)() else 'CheckpointHook'
+logger_interval = 50 if not getattr(sys, 'gettrace', lambda: False)() else 1
 
 default_hooks = dict(
     timer=dict(type='IterTimerHook'),
-    logger=dict(type='LoggerHook', interval=50),
+    logger=dict(type='LoggerHook', interval=logger_interval),
     param_scheduler=dict(type='ParamSchedulerHook'),
     checkpoint=dict(type=checkpoint_hook_type, interval=1, filename_tmpl='epoch_{:03d}.pth'),
     sampler_seed=dict(type='DistSamplerSeedHook'),
@@ -28,7 +29,7 @@ resume = False
 
 custom_hooks = [
     dict(type='NumClassCheckHook'),
-    dict(type='CheckInvalidLossHook', interval=50, priority='VERY_LOW'),
+    dict(type='CheckInvalidLossHook', interval=logger_interval, priority='VERY_LOW'),
 ]
 
 if not getattr(sys, 'gettrace', lambda: False)():
