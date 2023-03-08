@@ -916,6 +916,7 @@ class AddRandomNegatives(BaseTransform):
         rand_negs = np.random.randint(self.num_classes, size=self.total*2)
         rand_negs = [x for x in rand_negs if x not in results['pos_category_ids']]
         results['neg_category_ids'].extend(rand_negs[:needed])
+        return results
 
     def __repr__(self):
         return self.__class__.__name__ + f'(total={self.total})'
