@@ -73,6 +73,7 @@ class DETRHead(BaseModule):
                     ])),
             test_cfg: ConfigType = dict(max_per_img=100),
             fc_cls=dict(type='LinearClassPredictor'),
+            use_category_ids=False,
             init_cfg: OptMultiConfig = None) -> None:
         super().__init__(init_cfg=init_cfg)
         self.bg_cls_weight = 0
@@ -112,6 +113,7 @@ class DETRHead(BaseModule):
         self.loss_bbox = MODELS.build(loss_bbox)
         self.loss_iou = MODELS.build(loss_iou)
         self.fc_cls = fc_cls
+        self.use_category_ids = use_category_ids
 
         if self.loss_cls.use_sigmoid:
             self.cls_out_channels = num_classes
@@ -427,7 +429,12 @@ class DETRHead(BaseModule):
                                     self.num_classes,
                                     dtype=torch.long)
         labels[pos_inds] = gt_labels[pos_assigned_gt_inds]
-        label_weights = gt_bboxes.new_ones(num_bboxes)
+        if self.use_category_ids:
+            label_weights = gt_bboxes.new_zeros((num_bboxes, self.num_classes))
+            valid_cat_ids = img_meta['pos_category_ids'] + img_meta['neg_category_ids']
+            label_weights[:, valid_cat_ids] = 1
+        else:
+            label_weights = gt_bboxes.new_ones(num_bboxes)
 
         # bbox targets
         bbox_targets = torch.zeros_like(bbox_pred)
