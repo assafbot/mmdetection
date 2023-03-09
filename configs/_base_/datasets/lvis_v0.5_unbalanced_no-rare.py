@@ -19,9 +19,8 @@ train_pipeline = [
                 (1333, 768), (1333, 800)],
         keep_ratio=True),
     dict(type='RandomFlip', prob=0.5),
-    dict(type='PackDetInputs',
-         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape', 'scale_factor', 'flip', 'flip_direction',
-                    'neg_label_ids', 'not_exhaustive_label_ids', 'pos_label_ids'))
+    dict(type='RemoveLVISRareLabels'),
+    dict(type='PackDetInputs')
 ]
 test_pipeline = [
     dict(type='LoadImageFromFile', file_client_args=file_client_args),
@@ -40,12 +39,12 @@ train_dataloader = dict(
     sampler=dict(type='DefaultSampler', shuffle=True),
     batch_sampler=dict(type='AspectRatioBatchSampler'),
     dataset=dict(
-        type=dataset_type,
-        data_root=data_root,
-        ann_file='annotations/lvis_v0.5_train.json',
-        data_prefix=dict(img='train2017/'),
-        filter_cfg=dict(filter_empty_gt=True, min_size=32),
-        pipeline=train_pipeline))
+            type=dataset_type,
+            data_root=data_root,
+            ann_file='annotations/lvis_v0.5_train.json',
+            data_prefix=dict(img='train2017/'),
+            filter_cfg=dict(filter_empty_gt=True, min_size=32),
+            pipeline=train_pipeline))
 val_dataloader = dict(
     batch_size=1,
     num_workers=2,

@@ -912,10 +912,40 @@ class AddRandomNegatives(BaseTransform):
         self.total = total
 
     def transform(self, results: dict) -> Union[dict, None]:
-        needed = max(0, self.total - len(results['neg_category_ids']))
+        needed = max(0, self.total - len(results['neg_label_ids']))
         rand_negs = np.random.randint(self.num_classes, size=self.total*2)
-        rand_negs = [x for x in rand_negs if x not in results['pos_category_ids']]
-        results['neg_category_ids'].extend(rand_negs[:needed])
+        rand_negs = [x for x in rand_negs if x not in results['pos_label_ids']]
+        results['neg_label_ids'].extend(rand_negs[:needed])
+        return results
+
+    def __repr__(self):
+        return self.__class__.__name__ + f'(total={self.total})'
+
+
+@TRANSFORMS.register_module()
+class AddRandomNegativesV2(BaseTransform):
+    def __init__(self, num_classes, total=50, capacity=10_000):
+        self.total = total
+        self.capacity = capacity
+        self.num_classes = num_classes
+        self.queue = np.linspace(0, self.num_classes, self.capacity+1, dtype=np.int32)[:-1]
+
+    def transform(self, results: dict) -> Union[dict, None]:
+        cand_idx = np.random.choice(self.capacity, self.total * 2)
+        cand_labels = self.queue[cand_idx].tolist()
+        pos_label_ids = results['pos_label_ids']
+        neg_label_ids = results['neg_label_ids']
+        enq_labels = pos_label_ids + neg_label_ids + cand_labels
+        self.queue[cand_idx] = enq_labels[:self.total*2]
+
+        cand_negatives = list(set(cand_labels).difference(pos_label_ids))
+        np.random.shuffle(cand_negatives)
+
+        new_negatives = neg_label_ids + cand_negatives
+        new_num_negatives = max(len(neg_label_ids), self.total)
+        new_negatives = new_negatives[:new_num_negatives]
+        results['neg_label_ids'] = new_negatives
+
         return results
 
     def __repr__(self):

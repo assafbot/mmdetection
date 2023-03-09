@@ -125,16 +125,16 @@ class CocoDataset(BaseDetDataset):
         data_info['width'] = img_info['width']
 
         if 'neg_category_ids' in img_info:
-            data_info['neg_category_ids'] = [
+            data_info['neg_label_ids'] = [
                 self.cat2label[i] for i in img_info['neg_category_ids']]
 
         if 'not_exhaustive_category_ids' in img_info:
-            data_info['not_exhaustive_category_ids'] = [
+            data_info['not_exhaustive_label_ids'] = [
                 self.cat2label[i] for i in img_info['not_exhaustive_category_ids']]
 
         data_info['metainfo'] = self._metainfo
 
-        pos_category_ids = set()
+        pos_label_ids = set()
 
         instances = []
         for i, ann in enumerate(ann_info):
@@ -160,14 +160,14 @@ class CocoDataset(BaseDetDataset):
             instance['bbox'] = bbox
             instance['bbox_category_id'] = ann['category_id']
             instance['bbox_label'] = self.cat2label[ann['category_id']]
-            pos_category_ids.add(instance['bbox_label'])
+            pos_label_ids.add(instance['bbox_label'])
 
             if ann.get('segmentation', None):
                 instance['mask'] = ann['segmentation']
 
             instances.append(instance)
         data_info['instances'] = instances
-        data_info['pos_category_ids'] = list(pos_category_ids)
+        data_info['pos_label_ids'] = list(pos_label_ids)
 
         return data_info
 

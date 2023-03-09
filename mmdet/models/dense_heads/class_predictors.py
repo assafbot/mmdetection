@@ -1,5 +1,4 @@
 import re
-from random import choice
 
 import torch
 from mmengine.model import BaseModule, bias_init_with_prob
@@ -7,7 +6,6 @@ from torch import nn
 
 from mmdet.models.layers.scale import ScaleLayer
 from mmdet.registry import MODELS, DATASETS
-from mmdet.utils.clip import TRAINING_PROMPT_TEMPLATES
 
 try:
     import open_clip
@@ -51,14 +49,10 @@ class LinearClassPredictor(BaseModule):
         return self.pred(tensor)
 
 
-def _add_random_template(class_name):
-    return choice(TRAINING_PROMPT_TEMPLATES).format(class_name)
-
-
 class AbstractClipClassPredictor(BaseModule):
     def __init__(self, in_channels, out_channels,
-                 model_name=None, pretrained=None, dataset_name='CocoDataset', class_names=None, canonicalize_text_labels=False,
-                 norm_text=True, norm_image=False, scale=True, bias=True, scale_with_input=False, templates=['{}'], reduction='avg', random_template=False,
+                 model_name=None, pretrained=None, dataset_name='CocoDataset', class_names=None, canonicalize_text_labels=False, class_embeddings=None,
+                 norm_text=True, norm_image=False, scale=True, bias=True, scale_with_input=False, templates=['{}'], reduction='avg',
                  **kwargs):
         super().__init__(**kwargs)
         self.out_channels = out_channels
@@ -67,7 +61,11 @@ class AbstractClipClassPredictor(BaseModule):
         self.templates = templates
         self.reduction = reduction
         self.canonicalize_text_labels = canonicalize_text_labels
-        self.random_template = random_template
+
+        self.class_embeddings = class_embeddings
+        if self.class_embeddings is not None:
+            from mmengine.runner import CheckpointLoader
+            self.class_embeddings = CheckpointLoader.load_checkpoint(self.class_embeddings)
 
         if model_name is None or pretrained is None:
             raise ValueError(f'model_name and pretrained must be specified for {self.__class__.__name__}')
@@ -81,13 +79,13 @@ class AbstractClipClassPredictor(BaseModule):
 
         # TODO: @assaf support changing self.pred with a hook
         self.class_names = class_names or DATASETS.get(dataset_name).METAINFO['classes']
-        self.pred = self._get_pred(self.class_names)
+        self._set_pred(self.class_names)
 
     def to(self, device):
         super().to(device)
         self.model[0].to(device)
 
-    def _get_pred(self, class_names):
+    def _set_pred(self, class_names):
         with torch.no_grad():
             class_embeddings = self._get_class_embeddings(class_names)
             num_classes = class_embeddings.shape[0] // len(self.templates)
@@ -97,7 +95,7 @@ class AbstractClipClassPredictor(BaseModule):
             pred.weight.requires_grad = False
             pred.to(next(self.parameters()).device)
 
-        return pred
+        self._pred = pred
 
     def _get_class_embeddings(self, class_names):
         if self.canonicalize_text_labels:
@@ -137,16 +135,24 @@ class AbstractClipClassPredictor(BaseModule):
         #     self.class_names = ['screen']  # * self.out_channels
         #     self.class_names += [''] * (self.out_channels - len(self.class_names))
         #     print('Recomputing class names embeddings...', end='')
-        #     self.pred = self._get_pred(self.class_names)
+        #     self._set_pred(self.class_names)
         #     print(' Done!')
         #     self.once = True
 
-        if self.random_template and self.training:
-            assert self.templates == ['{}']
-            class_names = [_add_random_template(c) for c in self.class_names]
-            self.pred = self._get_pred(class_names)
-
         return self._forward(tensor)
+
+    def pred(self, image_emb):
+        if self.class_embeddings is not None:
+            self.class_embeddings = self.class_embeddings.to(image_emb.device)
+            if self.training:
+                p = torch.randint(0, self.class_embeddings.shape[1], (self.class_embeddings.shape[2],))
+                i = torch.arange(0, self.class_embeddings.shape[2])
+                logits = image_emb @ self.class_embeddings[:, p, i]
+            else:
+                logits = image_emb @ self.class_embeddings[:, 0]
+        else:
+            logits = self._pred(image_emb)
+        return logits
 
     def _forward(self, tensor):
         raise NotImplementedError()

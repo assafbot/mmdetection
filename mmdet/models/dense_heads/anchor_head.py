@@ -277,7 +277,7 @@ class AnchorHead(BaseDenseHead):
         if self.use_category_ids:
             label_weights = anchors.new_zeros((num_valid_anchors, self.num_classes), dtype=torch.uint8, requires_grad=False)
             class_weights = anchors.new_zeros(self.num_classes, dtype=torch.uint8, requires_grad=False)
-            valid_cat_ids = img_meta['pos_category_ids'] + img_meta['neg_category_ids']
+            valid_cat_ids = img_meta['pos_label_ids'] + img_meta['neg_label_ids']
             class_weights[valid_cat_ids] = 1
         else:
             label_weights = anchors.new_zeros((num_valid_anchors,), dtype=torch.float, requires_grad=False)
@@ -304,7 +304,7 @@ class AnchorHead(BaseDenseHead):
             else:
                 label_weights[pos_inds] = class_weights * self.train_cfg['pos_weight']
 
-        # TODO: @assaf zero weight for negative samples with class in 'not_exhaustive_category_ids'
+        # TODO: @assaf zero weight for negative samples with class in 'not_exhaustive_label_ids'
         if len(neg_inds) > 0:
             label_weights[neg_inds] = class_weights
 

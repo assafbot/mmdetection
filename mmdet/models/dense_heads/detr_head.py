@@ -431,7 +431,7 @@ class DETRHead(BaseModule):
         labels[pos_inds] = gt_labels[pos_assigned_gt_inds]
         if self.use_category_ids:
             label_weights = gt_bboxes.new_zeros((num_bboxes, self.num_classes))
-            valid_cat_ids = img_meta['pos_category_ids'] + img_meta['neg_category_ids']
+            valid_cat_ids = img_meta['pos_label_ids'] + img_meta['neg_label_ids']
             label_weights[:, valid_cat_ids] = 1
         else:
             label_weights = gt_bboxes.new_ones(num_bboxes)
