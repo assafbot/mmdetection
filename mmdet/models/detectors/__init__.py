@@ -31,6 +31,7 @@ from .mask_rcnn import MaskRCNN
 from .mask_scoring_rcnn import MaskScoringRCNN
 from .maskformer import MaskFormer
 from .nasfcos import NASFCOS
+from .owl_vit import OWLViT
 from .paa import PAA
 from .panoptic_fpn import PanopticFPN
 from .panoptic_two_stage_segmentor import TwoStagePanopticSegmentor
@@ -67,5 +68,5 @@ __all__ = [
     'TwoStagePanopticSegmentor', 'PanopticFPN', 'QueryInst', 'LAD', 'TOOD',
     'MaskFormer', 'DDOD', 'Mask2Former', 'SemiBaseDetector', 'SoftTeacher',
     'RTMDet', 'Detectron2Wrapper', 'CrowdDet', 'CondInst', 'BoxInst',
-    'DetectionTransformer', 'ConditionalDETR', 'DINO', 'DABDETR'
+    'DetectionTransformer', 'ConditionalDETR', 'DINO', 'DABDETR', 'OWLViT'
 ]

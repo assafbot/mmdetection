@@ -32,6 +32,7 @@ from .ld_head import LDHead
 from .mask2former_head import Mask2FormerHead
 from .maskformer_head import MaskFormerHead
 from .nasfcos_head import NASFCOSHead
+from .owl_vit_head import OWLViTHead
 from .paa_head import PAAHead
 from .pisa_retinanet_head import PISARetinaHead
 from .pisa_ssd_head import PISASSDHead
@@ -67,5 +68,5 @@ __all__ = [
     'CenterNetUpdateHead', 'RTMDetHead', 'RTMDetSepBNHead', 'CondInstBboxHead',
     'CondInstMaskHead', 'RTMDetInsHead', 'RTMDetInsSepBNHead',
     'BoxInstBboxHead', 'BoxInstMaskHead', 'ConditionalDETRHead', 'DINOHead',
-    'DABDETRHead', 'ClipHead', 'ConvClassPredictor'
+    'DABDETRHead', 'ClipHead', 'ConvClassPredictor', 'OWLViTHead'
 ]
