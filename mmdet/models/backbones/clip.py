@@ -5,7 +5,6 @@ from mmengine.model import BaseModule, ModuleList
 from torch.nn.modules.batchnorm import _BatchNorm
 
 from mmdet.registry import MODELS
-from mmdet.utils.clip import create_model_and_transforms
 
 try:
     import open_clip
