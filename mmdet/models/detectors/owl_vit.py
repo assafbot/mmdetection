@@ -1,6 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from abc import ABCMeta, abstractmethod
-from typing import Dict, List, Tuple, Union
+from abc import ABCMeta
+from typing import List, Tuple, Union
 
 from torch import Tensor
 

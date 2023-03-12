@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from mmcv.cnn import Linear
 from mmcv.cnn.bricks.transformer import FFN
-from mmengine.model import BaseModule, bias_init_with_prob, constant_init
+from mmengine.model import BaseModule, bias_init_with_prob
 from mmengine.structures import InstanceData
 from torch import Tensor
 
