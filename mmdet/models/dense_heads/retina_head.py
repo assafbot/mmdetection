@@ -32,6 +32,8 @@ class RetinaHead(AnchorHead):
                  num_classes,
                  in_channels,
                  stacked_convs=4,
+                 stacked_cls_convs=None,
+                 stacked_reg_convs=None,
                  conv_cfg=None,
                  norm_cfg=None,
                  anchor_generator=dict(
@@ -46,10 +48,16 @@ class RetinaHead(AnchorHead):
                      std=0.01),
                  retina_cls=dict(type='ConvClassPredictor', kernel_size=3, padding=1),
                  **kwargs):
-        assert stacked_convs >= 0, \
-            '`stacked_convs` must be non-negative integers, ' \
-            f'but got {stacked_convs} instead.'
-        self.stacked_convs = stacked_convs
+        if stacked_cls_convs is None and stacked_reg_convs is None:
+            assert stacked_convs >= 0, \
+                '`stacked_convs` must be non-negative integers, ' \
+                f'but got {stacked_convs} instead.'
+            self.stacked_cls_convs = self.stacked_reg_convs = stacked_convs
+        else:
+            assert stacked_cls_convs is not None and stacked_reg_convs is not None and stacked_convs is None
+            self.stacked_cls_convs = stacked_cls_convs
+            self.stacked_reg_convs = stacked_reg_convs
+
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.retina_cls = retina_cls
@@ -66,7 +74,7 @@ class RetinaHead(AnchorHead):
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
         in_channels = self.in_channels
-        for i in range(self.stacked_convs):
+        for i in range(self.stacked_cls_convs):
             self.cls_convs.append(
                 ConvModule(
                     in_channels,
@@ -76,6 +84,7 @@ class RetinaHead(AnchorHead):
                     padding=1,
                     conv_cfg=self.conv_cfg,
                     norm_cfg=self.norm_cfg))
+        for i in range(self.stacked_reg_convs):
             self.reg_convs.append(
                 ConvModule(
                     in_channels,
