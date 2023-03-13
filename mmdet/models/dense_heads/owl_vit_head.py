@@ -5,8 +5,6 @@ from typing import Dict, List, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from mmcv.cnn import Linear
-from mmcv.cnn.bricks.transformer import FFN
 from mmengine.model import BaseModule, bias_init_with_prob
 from mmengine.structures import InstanceData
 from torch import Tensor
@@ -16,8 +14,45 @@ from mmdet.structures import SampleList
 from mmdet.structures.bbox import bbox_cxcywh_to_xyxy, bbox_xyxy_to_cxcywh
 from mmdet.utils import (ConfigType, InstanceList, OptInstanceList,
                          OptMultiConfig, reduce_mean)
-from .class_predictors import LinearClassPredictor
+from .class_predictors import ConvClassPredictor
 from ..utils import multi_apply
+
+
+def normalized_grid_corner_coordinates(feature_map):
+    """Computes normalized xy corner coords from feature_map or padding_mask."""
+    # Note 1: it computes not the centers of grid patches, but the patch corner
+    # coordinates (for a grid patch from 0 to 0.1, it returns 0.1 not 0.05).
+    # Note 2: behavior is quite different for feature_map and padding_mask inputs.
+    assert feature_map.ndim == 4  # [B, C, H, W]
+    h, w = feature_map.shape[2:4]
+    xy = torch.stack(torch.meshgrid(torch.arange(0.5, w + 0.5, dtype=torch.float),
+                                    torch.arange(0.5, h + 0.5, dtype=torch.float), indexing='xy'), axis=-1)
+    xy /= torch.FloatTensor([w, h])
+    return xy
+
+
+def compute_box_bias(feature_map, kind):
+    """Computes spatial bias for grid."""
+    # The box center is biased to its position on the feature grid:
+    xy = normalized_grid_corner_coordinates(feature_map)
+    xy = torch.clip(xy, 0.0, 1.0)
+
+    if kind in ['both', 'location']:
+        # Unnormalize xy (i.e., apply logit function/sigmoid^-1).
+        xy_bias = torch.logit(xy)
+    else:
+        xy_bias = torch.zeros_like(xy)
+
+    if kind in ['both', 'size']:
+        # The box size is biased to the patch size:
+        h, w = feature_map.shape[2:4]
+        wh_bias = torch.logit(torch.full_like(xy_bias, 1.0 / min(h, w)))
+    else:
+        wh_bias = torch.zeros_like(xy_bias)
+
+    bias = torch.concatenate([xy_bias, wh_bias], axis=-1)
+    bias = bias.to(feature_map.device)
+    return bias
 
 
 @MODELS.register_module()
@@ -30,6 +65,7 @@ class OWLViTHead(BaseModule):
             embed_dims: int = 256,
             num_reg_fcs: int = 2,
             sync_cls_avg_factor: bool = False,
+            reg_variance: float = 10.0,
             loss_cls: ConfigType = dict(
                 type='CrossEntropyLoss',
                 bg_cls_weight=0.1,
@@ -47,7 +83,7 @@ class OWLViTHead(BaseModule):
                         dict(type='IoUCost', iou_mode='giou', weight=2.0)
                     ])),
             test_cfg: ConfigType = dict(max_per_img=100),
-            fc_cls=dict(type='LinearClassPredictor'),
+            fc_cls=dict(type='ConvClassPredictor'),
             use_category_ids=False,
             init_cfg: OptMultiConfig = None) -> None:
         super().__init__(init_cfg=init_cfg)
@@ -95,6 +131,7 @@ class OWLViTHead(BaseModule):
 
         self.fc_cls = fc_cls
         self.use_category_ids = use_category_ids
+        self.reg_variance = reg_variance
 
         if self.loss_cls.use_sigmoid:
             self.cls_out_channels = num_classes
@@ -107,45 +144,48 @@ class OWLViTHead(BaseModule):
         """Initialize layers of the transformer head."""
         # cls branch
         self.fc_cls = copy.deepcopy(self.fc_cls)
-        self.fc_cls.update({'in_channels': self.embed_dims, 'out_channels': self.cls_out_channels})
+        self.fc_cls.update({'in_channels': self.embed_dims,
+                            'out_channels': self.cls_out_channels,
+                            'num_base_priors': 1})
         self.fc_cls = MODELS.build(self.fc_cls)
 
-        # reg branch
-        self.activate = nn.ReLU()
-        self.reg_ffn = FFN(
-            self.embed_dims,
-            self.embed_dims,
-            self.num_reg_fcs,
-            dict(type='ReLU', inplace=True),
-            dropout=0.0,
-            add_residual=False)
-
-        # NOTE the activations of reg_branch here is the same as
-        # those in transformer, but they are actually different
-        # in DAB-DETR (prelu in transformer and relu in reg_branch)
-        self.fc_reg = Linear(self.embed_dims, 4)
+        self.fc_reg = nn.Sequential(
+            nn.Conv2d(self.embed_dims, self.embed_dims, 1), nn.ReLU(),
+            nn.Conv2d(self.embed_dims, self.embed_dims, 1), nn.ReLU(),
+            nn.Conv2d(self.embed_dims, self.embed_dims, 1), nn.ReLU(),
+            nn.Conv2d(self.embed_dims, 4, 1)
+        )
 
     def init_weights(self) -> None:
         super().init_weights()
         if self.loss_cls.use_sigmoid:
             bias_init = bias_init_with_prob(0.01)
             m = self.fc_cls
-            if isinstance(m, LinearClassPredictor):
-                nn.init.constant_(m.pred.bias, bias_init)
+            if isinstance(m, ConvClassPredictor):
+                nn.init.constant_(m.conv.bias, bias_init)
 
-    def forward(self, img_feats: Tensor) -> Tuple[Tensor]:
-        layers_cls_scores = self.fc_cls(img_feats)
-        layers_bbox_preds = self.fc_reg(self.activate(self.reg_ffn(img_feats))).sigmoid()
+    def forward(self, batch_inputs: Tensor) -> Tuple[Tensor]:
+        assert batch_inputs.shape[0] == 1
+        layers_cls_scores = self.fc_cls(batch_inputs[0])[None]
+        layers_bbox_preds = self.fc_reg(batch_inputs[0])[None] * self.reg_variance
+        bias = compute_box_bias(batch_inputs[0], kind='both')
+        bias = bias.permute(2, 0, 1)[None, None]
+        layers_bbox_preds += bias
+        layers_bbox_preds = layers_bbox_preds.sigmoid()
+
+        layers_cls_scores = layers_cls_scores.flatten(start_dim=3).permute(0, 1, 3, 2)
+        layers_bbox_preds = layers_bbox_preds.flatten(start_dim=3).permute(0, 1, 3, 2)
+
         return layers_cls_scores, layers_bbox_preds
 
-    def loss(self, img_feats: Tensor, batch_data_samples: SampleList) -> dict:
+    def loss(self, batch_inputs: Tensor, batch_data_samples: SampleList) -> dict:
         batch_gt_instances = []
         batch_img_metas = []
         for data_sample in batch_data_samples:
             batch_img_metas.append(data_sample.metainfo)
             batch_gt_instances.append(data_sample.gt_instances)
 
-        outs = self(img_feats)
+        outs = self(batch_inputs)
         loss_inputs = outs + (batch_gt_instances, batch_img_metas)
         losses = self.loss_by_feat(*loss_inputs)
         return losses
@@ -253,8 +293,7 @@ class OWLViTHead(BaseModule):
 
     def _get_targets_single(self, cls_score: Tensor, bbox_pred: Tensor, gt_instances: InstanceData, img_meta: dict) -> tuple:
         img_h, img_w = img_meta['img_shape']
-        factor = bbox_pred.new_tensor([img_w, img_h, img_w,
-                                       img_h]).unsqueeze(0)
+        factor = bbox_pred.new_tensor([img_w, img_h, img_w, img_h]).unsqueeze(0)
         num_bboxes = bbox_pred.size(0)
         # convert bbox_pred from xywh, normalized to xyxy, unnormalized
         bbox_pred = bbox_cxcywh_to_xyxy(bbox_pred)
@@ -303,7 +342,7 @@ class OWLViTHead(BaseModule):
                 neg_inds)
 
     def loss_and_predict(
-            self, img_feats: Tuple[Tensor],
+            self, batch_inputs: Tuple[Tensor],
             batch_data_samples: SampleList) -> Tuple[dict, InstanceList]:
         batch_gt_instances = []
         batch_img_metas = []
@@ -311,16 +350,16 @@ class OWLViTHead(BaseModule):
             batch_img_metas.append(data_sample.metainfo)
             batch_gt_instances.append(data_sample.gt_instances)
 
-        outs = self(img_feats)
+        outs = self(batch_inputs)
         loss_inputs = outs + (batch_gt_instances, batch_img_metas)
         losses = self.loss_by_feat(*loss_inputs)
 
         predictions = self.predict_by_feat(*outs, batch_img_metas=batch_img_metas)
         return losses, predictions
 
-    def predict(self, img_feats: Tuple[Tensor], batch_data_samples: SampleList, rescale: bool = True) -> InstanceList:
+    def predict(self, batch_inputs: Tuple[Tensor], batch_data_samples: SampleList, rescale: bool = True) -> InstanceList:
         batch_img_metas = [data_samples.metainfo for data_samples in batch_data_samples]
-        last_layer_hidden_state = img_feats[-1].unsqueeze(0)
+        last_layer_hidden_state = batch_inputs[-1].unsqueeze(0)
         outs = self(last_layer_hidden_state)
         predictions = self.predict_by_feat(*outs, batch_img_metas=batch_img_metas, rescale=rescale)
 

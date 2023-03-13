@@ -54,11 +54,12 @@ class ClipViT(BaseModule):
             pe = torch.cat((cls_emb, grid_emb))
             vit.positional_embedding = torch.nn.Parameter(pe, requires_grad=False)
 
-        _, image_features = vit(x)
-        # n, _, c = image_features.shape
-        # image_features = image_features.reshape(n, *self.model.visual.grid_size, c)
-        # image_features = image_features.permute(0, 3, 1, 2)
-        return image_features[None]
+        _, features = vit(x)
+        features = features @ vit.proj
+        n, _, c = features.shape
+        features = features.reshape(n, *self.model.visual.grid_size, c)
+        features = features.permute(0, 3, 1, 2)
+        return [features]
 
     def train(self, mode=True):
         if self.frozen:

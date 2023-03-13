@@ -89,8 +89,8 @@ class RetinaHead(AnchorHead):
 
         self.retina_cls = deepcopy(self.retina_cls)
         self.retina_cls.update({'in_channels': in_channels,
-                           'num_base_priors': self.num_base_priors,
-                           'cls_out_channels': self.cls_out_channels})
+                                'num_base_priors': self.num_base_priors,
+                                'out_channels': self.cls_out_channels})
         self.retina_cls = MODELS.build(self.retina_cls)
         reg_dim = self.bbox_coder.encode_size
         self.retina_reg = nn.Conv2d(
