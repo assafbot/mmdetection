@@ -35,6 +35,7 @@ class ResLayer(Sequential):
                  num_blocks: int,
                  stride: int = 1,
                  avg_down: bool = False,
+                 avg_down2: bool = False,
                  conv_cfg: OptConfigType = None,
                  norm_cfg: ConfigType = dict(type='BN'),
                  downsample_first: bool = True,
@@ -75,6 +76,7 @@ class ResLayer(Sequential):
                     downsample=downsample,
                     conv_cfg=conv_cfg,
                     norm_cfg=norm_cfg,
+                    avg_down2=avg_down2,
                     **kwargs))
             inplanes = planes * block.expansion
             for _ in range(1, num_blocks):
@@ -105,6 +107,7 @@ class ResLayer(Sequential):
                     downsample=downsample,
                     conv_cfg=conv_cfg,
                     norm_cfg=norm_cfg,
+                    avg_down2=avg_down2,
                     **kwargs))
         super().__init__(*layers)
 

@@ -21,6 +21,7 @@ Example:
         python demo/image_demo.py demo/demo.jpg rtmdet-ins_s_8xb32-300e_coco \
         --show
 """
+from mmdet.engine import load_from_mentee
 
 from argparse import ArgumentParser
 

@@ -23,6 +23,7 @@ class BasicBlock(BaseModule):
                  style='pytorch',
                  with_cp=False,
                  conv_cfg=None,
+                 avg_down2=False,
                  norm_cfg=dict(type='BN'),
                  dcn=None,
                  plugins=None,
@@ -106,6 +107,7 @@ class Bottleneck(BaseModule):
                  style='pytorch',
                  with_cp=False,
                  conv_cfg=None,
+                 avg_down2=False,
                  norm_cfg=dict(type='BN'),
                  dcn=None,
                  plugins=None,
@@ -153,10 +155,12 @@ class Bottleneck(BaseModule):
 
         if self.style == 'pytorch':
             self.conv1_stride = 1
-            self.conv2_stride = stride
+            self.conv2_stride = stride if not avg_down2 else 1
         else:
-            self.conv1_stride = stride
+            self.conv1_stride = stride if not avg_down2 else 1
             self.conv2_stride = 1
+
+        self.avgpool = nn.AvgPool2d(stride) if avg_down2 and stride > 1 else nn.Identity()
 
         self.norm1_name, norm1 = build_norm_layer(norm_cfg, planes, postfix=1)
         self.norm2_name, norm2 = build_norm_layer(norm_cfg, planes, postfix=2)
@@ -269,12 +273,18 @@ class Bottleneck(BaseModule):
             out = self.norm1(out)
             out = self.relu(out)
 
+            if not self.style == 'pytorch':
+                out = self.avgpool(out)
+
             if self.with_plugins:
                 out = self.forward_plugin(out, self.after_conv1_plugin_names)
 
             out = self.conv2(out)
             out = self.norm2(out)
             out = self.relu(out)
+
+            if self.style == 'pytorch':
+                out = self.avgpool(out)
 
             if self.with_plugins:
                 out = self.forward_plugin(out, self.after_conv2_plugin_names)
@@ -378,7 +388,9 @@ class ResNet(BaseModule):
                  style='pytorch',
                  deep_stem=False,
                  avg_down=False,
+                 avg_down2=False,
                  frozen_stages=-1,
+                 maxpool=True,
                  conv_cfg=None,
                  norm_cfg=dict(type='BN', requires_grad=True),
                  norm_eval=True,
@@ -440,6 +452,7 @@ class ResNet(BaseModule):
         self.style = style
         self.deep_stem = deep_stem
         self.avg_down = avg_down
+        self.avg_down2 = avg_down2
         self.frozen_stages = frozen_stages
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
@@ -454,7 +467,7 @@ class ResNet(BaseModule):
         self.stage_blocks = stage_blocks[:num_stages]
         self.inplanes = stem_channels
 
-        self._make_stem_layer(in_channels, stem_channels)
+        self._make_stem_layer(in_channels, stem_channels, maxpool)
 
         self.res_layers = []
         for i, num_blocks in enumerate(self.stage_blocks):
@@ -475,6 +488,7 @@ class ResNet(BaseModule):
                 dilation=dilation,
                 style=self.style,
                 avg_down=self.avg_down,
+                avg_down2=self.avg_down2,
                 with_cp=with_cp,
                 conv_cfg=conv_cfg,
                 norm_cfg=norm_cfg,
@@ -562,7 +576,7 @@ class ResNet(BaseModule):
         """nn.Module: the normalization layer named "norm1" """
         return getattr(self, self.norm1_name)
 
-    def _make_stem_layer(self, in_channels, stem_channels):
+    def _make_stem_layer(self, in_channels, stem_channels, maxpool):
         if self.deep_stem:
             self.stem = nn.Sequential(
                 build_conv_layer(
@@ -608,7 +622,7 @@ class ResNet(BaseModule):
                 self.norm_cfg, stem_channels, postfix=1)
             self.add_module(self.norm1_name, norm1)
             self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1) if maxpool else nn.AvgPool2d(kernel_size=2, stride=2, padding=0)
 
     def _freeze_stages(self):
         if self.frozen_stages >= 0:
