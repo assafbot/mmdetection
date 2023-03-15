@@ -14,7 +14,7 @@ from mmdet.structures import SampleList
 from mmdet.structures.bbox import bbox_cxcywh_to_xyxy, bbox_xyxy_to_cxcywh
 from mmdet.utils import (ConfigType, InstanceList, OptInstanceList,
                          OptMultiConfig, reduce_mean)
-from .class_predictors import ConvClassPredictor
+from .class_predictors import ConvClassPredictor, LinearClassPredictor
 from ..utils import multi_apply
 
 
@@ -46,7 +46,7 @@ def compute_box_bias(feature_map, kind):
     if kind in ['both', 'size']:
         # The box size is biased to the patch size:
         h, w = feature_map.shape[2:4]
-        wh_bias = torch.logit(torch.full_like(xy_bias, 1.0 / min(h, w)))
+        wh_bias = torch.logit(torch.ones_like(xy_bias) * torch.Tensor([[1/w, 1/h]]))
     else:
         wh_bias = torch.zeros_like(xy_bias)
 
@@ -83,7 +83,7 @@ class OWLViTHead(BaseModule):
                         dict(type='IoUCost', iou_mode='giou', weight=2.0)
                     ])),
             test_cfg: ConfigType = dict(max_per_img=100),
-            fc_cls=dict(type='ConvClassPredictor'),
+            fc_cls=dict(type='LinearClassPredictor'),
             use_category_ids=False,
             init_cfg: OptMultiConfig = None) -> None:
         super().__init__(init_cfg=init_cfg)
@@ -145,15 +145,13 @@ class OWLViTHead(BaseModule):
         # cls branch
         self.fc_cls = copy.deepcopy(self.fc_cls)
         self.fc_cls.update({'in_channels': self.embed_dims,
-                            'out_channels': self.cls_out_channels,
-                            'num_base_priors': 1})
+                            'out_channels': self.cls_out_channels})
         self.fc_cls = MODELS.build(self.fc_cls)
 
         self.fc_reg = nn.Sequential(
-            nn.Conv2d(self.embed_dims, self.embed_dims, 1), nn.ReLU(),
-            nn.Conv2d(self.embed_dims, self.embed_dims, 1), nn.ReLU(),
-            nn.Conv2d(self.embed_dims, self.embed_dims, 1), nn.ReLU(),
-            nn.Conv2d(self.embed_dims, 4, 1)
+            nn.Linear(self.embed_dims, self.embed_dims), nn.ReLU(),
+            nn.Linear(self.embed_dims, self.embed_dims), nn.ReLU(),
+            nn.Linear(self.embed_dims, 4)
         )
 
     def init_weights(self) -> None:
@@ -163,20 +161,18 @@ class OWLViTHead(BaseModule):
             m = self.fc_cls
             if isinstance(m, ConvClassPredictor):
                 nn.init.constant_(m.conv.bias, bias_init)
+            if isinstance(m, LinearClassPredictor):
+                nn.init.constant_(m.pred.bias, bias_init)
 
     def forward(self, batch_inputs: Tensor) -> Tuple[Tensor]:
-        assert batch_inputs.shape[0] == 1
-        layers_cls_scores = self.fc_cls(batch_inputs[0])[None]
-        layers_bbox_preds = self.fc_reg(batch_inputs[0])[None] * self.reg_variance
-        bias = compute_box_bias(batch_inputs[0], kind='both')
-        bias = bias.permute(2, 0, 1)[None, None]
+        features, features_map = batch_inputs
+        layers_cls_scores = self.fc_cls(features)
+        layers_bbox_preds = self.fc_reg(features)
+        bias = compute_box_bias(features_map, kind='both')
+        bias = bias.reshape(1, -1, 4)
         layers_bbox_preds += bias
         layers_bbox_preds = layers_bbox_preds.sigmoid()
-
-        layers_cls_scores = layers_cls_scores.flatten(start_dim=3).permute(0, 1, 3, 2)
-        layers_bbox_preds = layers_bbox_preds.flatten(start_dim=3).permute(0, 1, 3, 2)
-
-        return layers_cls_scores, layers_bbox_preds
+        return layers_cls_scores[None], layers_bbox_preds[None]
 
     def loss(self, batch_inputs: Tensor, batch_data_samples: SampleList) -> dict:
         batch_gt_instances = []

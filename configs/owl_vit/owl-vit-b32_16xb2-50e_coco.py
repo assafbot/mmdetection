@@ -6,14 +6,14 @@ model = dict(
     data_preprocessor=dict(
         type='DetDataPreprocessor',
         mean=[123.675, 116.28, 103.53],
-        std=[58.395, 57.12, 57.375],
+        std=[58.395, 57.12, 57.375],  # TODO: @assaf fix normalization?
         bgr_to_rgb=True,
         pad_size_divisor=32),
     backbone=dict(
         type='ClipViT',
         model_name='ViT-B-32',
         pretrained='openai',
-        frozen=True,
+        frozen=False,
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
     bbox_head=dict(
         type='OWLViTHead',
