@@ -288,7 +288,7 @@ class OWLViTHead(BaseModule):
                 bbox_weights_list, num_total_pos, num_total_neg)
 
     def _get_targets_single(self, cls_score: Tensor, bbox_pred: Tensor, gt_instances: InstanceData, img_meta: dict) -> tuple:
-        img_h, img_w = img_meta['img_shape']
+        img_h, img_w = img_meta['batch_input_shape']
         factor = bbox_pred.new_tensor([img_w, img_h, img_w, img_h]).unsqueeze(0)
         num_bboxes = bbox_pred.size(0)
         # convert bbox_pred from xywh, normalized to xyxy, unnormalized
@@ -355,8 +355,7 @@ class OWLViTHead(BaseModule):
 
     def predict(self, batch_inputs: Tuple[Tensor], batch_data_samples: SampleList, rescale: bool = True) -> InstanceList:
         batch_img_metas = [data_samples.metainfo for data_samples in batch_data_samples]
-        last_layer_hidden_state = batch_inputs[-1].unsqueeze(0)
-        outs = self(last_layer_hidden_state)
+        outs = self(batch_inputs)
         predictions = self.predict_by_feat(*outs, batch_img_metas=batch_img_metas, rescale=rescale)
 
         return predictions
@@ -401,8 +400,7 @@ class OWLViTHead(BaseModule):
             cls_score = cls_scores[img_id]
             bbox_pred = bbox_preds[img_id]
             img_meta = batch_img_metas[img_id]
-            results = self._predict_by_feat_single(cls_score, bbox_pred,
-                                                   img_meta, rescale)
+            results = self._predict_by_feat_single(cls_score, bbox_pred, img_meta, rescale)
             result_list.append(results)
         return result_list
 
@@ -438,7 +436,7 @@ class OWLViTHead(BaseModule):
         """
         assert len(cls_score) == len(bbox_pred)  # num_queries
         max_per_img = self.test_cfg.get('max_per_img', len(cls_score))
-        img_shape = img_meta['img_shape']
+        img_shape = img_meta['batch_input_shape']
         # exclude background
         if self.loss_cls.use_sigmoid:
             cls_score = cls_score.sigmoid()
