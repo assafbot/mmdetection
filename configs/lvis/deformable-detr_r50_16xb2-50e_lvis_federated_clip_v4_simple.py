@@ -7,5 +7,5 @@ model = dict(
     encoder=dict(num_layers=1),
     decoder=dict(num_layers=1),
     backbone=dict(pretrained='openai'),
-    bbox_head=dict(fc_cls=dict(class_embeddings='mentee://mmdetection/pretrained/LVIS1023_embeddings_RN50_with-clip-templates.pth'))
+    bbox_head=dict(fc_cls=dict(class_embeddings='mentee://mmdetection/embeddings/LVISV1Dataset_classes1203_RN50_openai_normalize_embeddings_templates81.pth'))
 )

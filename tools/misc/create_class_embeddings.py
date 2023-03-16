@@ -26,7 +26,7 @@ def create_class_embeddings(dataset, model_name, pretrained, normalize):
             embs = model.encode_text(tokenizer(texts), normalize=normalize).T
             class_embeddings.append(embs[None])
 
-        class_embeddings = torch.cat(class_embeddings)
+        class_embeddings = torch.cat(class_embeddings).permute(1, 0, 2)
 
     save_name = f'/tmp/{dataset.__name__}_classes{len(class_names)}_{model_name}_{pretrained}' \
                 f'_{"normalize_" if normalize else ""}embeddings_templates{len(templates)}.pth'
