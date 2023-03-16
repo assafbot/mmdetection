@@ -2,7 +2,7 @@
 
 import torch
 from mmengine.model import BaseModule, ModuleList
-from torch.nn.modules.batchnorm import _BatchNorm
+from torch.nn.modules.batchnorm import _BatchNorm, _NormBase
 
 from mmdet.registry import MODELS
 
@@ -14,7 +14,7 @@ except ImportError:
 
 @MODELS.register_module()
 class ClipViT(BaseModule):
-    def __init__(self, model_name, pretrained=None, init_cfg=None, frozen=False):
+    def __init__(self, model_name, pretrained=None, init_cfg=None, frozen_stages=-1, norm_eval=False, final_ln_post=True):
         super(ClipViT, self).__init__(init_cfg)
         if open_clip is None:
             raise ImportError(f'Please run "pip install open_clip_torch" to use {self.__class__.__name__}')
@@ -27,6 +27,7 @@ class ClipViT(BaseModule):
         self.vit.proj = None
 
         self.ln_post = self.vit.ln_post
+        self.final_ln_post = final_ln_post  # this might be a bug, kept only for backward compatibility
         self.vit.ln_post = torch.nn.Identity()
 
         # Save original parameters
@@ -35,11 +36,9 @@ class ClipViT(BaseModule):
         self.grid_size = self.vit.grid_size
         self.image_size = self.vit.image_size
 
-        self.frozen = frozen
-        self._freeze()
-
-    def _freeze(self):
-        self.eval()
+        self.frozen_stages = frozen_stages
+        self.norm_eval = norm_eval
+        self._freeze_stages()
 
     def forward(self, x):
         image_size = x.shape[2:]
@@ -66,21 +65,48 @@ class ClipViT(BaseModule):
 
         token, features = combined[:, :1], combined[:, 1:]
         features = features * token
-        features = self.ln_post(features)
+        if self.final_ln_post:  # this might be a bug to reuse the same LN layer
+            features = self.ln_post(features)
 
         n, _, c = features.shape
         features_map = features.reshape(n, *self.vit.grid_size, c).permute(0, 3, 1, 2)
         return features, features_map
 
+    def _freeze_stages(self):
+        vit = self.vit
+        if self.frozen_stages >= 0:
+            vit.positional_embedding.requires_grad = False
+            vit.class_embedding.requires_grad = False
+            for m in [vit.patchnorm_pre_ln, vit.conv1, vit.patch_dropout, vit.ln_pre]:
+                self._freeze_layer(m)
+
+        for i in range(1, self.frozen_stages + 1):
+            m = vit.transformer.resblocks[i - 1]
+            self._freeze_layer(m)
+
+        if self.frozen_stages == len(vit.transformer.resblocks):
+            if vit.proj:
+                vit.proj.requires_grad = False
+
+            for m in [vit.attn_pool, vit.ln_post, vit.ln_post, self.ln_post]:
+                if m is None:
+                    continue
+                self._freeze_layer(m)
+
+    def _freeze_layer(self, m):
+        m.eval()
+        for param in m.parameters():
+            param.requires_grad = False
+
     def train(self, mode=True):
-        if self.frozen:
-            mode = False
-
         super(ClipViT, self).train(mode)
+        self._freeze_stages()
 
-        if self.frozen:
-            for param in self.parameters():
-                param.requires_grad = False
+        # trick: eval have effect on NormBase only
+        if mode and self.norm_eval:
+            for m in self.modules():
+                if isinstance(m, _NormBase):
+                    self._freeze_layer(m)
 
 
 @MODELS.register_module()

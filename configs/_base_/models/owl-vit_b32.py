@@ -10,7 +10,6 @@ model = dict(
         type='ClipViT',
         model_name='ViT-B-32',
         pretrained='openai',
-        frozen=False,
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
     bbox_head=dict(
         type='OWLViTHead',
