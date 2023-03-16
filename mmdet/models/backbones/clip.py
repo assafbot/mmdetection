@@ -138,11 +138,15 @@ class ClipResNet(BaseModule):
         self._freeze_stages()
 
     def _freeze_stages(self):
+        layers = self.layers + [self.attnpool]
         for i in range(max(self.frozen_stages, -1) + 1):
-            m = self.layers[i]
-            m.eval()
-            for param in m.parameters():
-                param.requires_grad = False
+            m = layers[i]
+            self._freeze_layer(m)
+
+    def _freeze_layer(self, m):
+        m.eval()
+        for param in m.parameters():
+            param.requires_grad = False
 
     def train(self, mode=True):
         super(ClipResNet, self).train(mode)

@@ -19,7 +19,6 @@ train_pipeline = [
                 (1333, 768), (1333, 800)],
         keep_ratio=True),
     dict(type='RandomFlip', prob=0.5),
-    dict(type='RemoveLVISRareLabels'),
     dict(type='PackDetInputs')
 ]
 test_pipeline = [

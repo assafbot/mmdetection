@@ -7,7 +7,7 @@ model = dict(
         fc_cls=dict(
             type='ClipLinearClassPredictor',
             norm_image=True,
-            model_name='RN50',
+            model_name='ViT-B-32',
             pretrained='openai',
             dataset_name='CocoDataset',
             init_cfg=[dict(type='Normal', layer='Conv2d', std=0.01),
