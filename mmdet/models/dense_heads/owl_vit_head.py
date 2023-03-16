@@ -165,7 +165,9 @@ class OWLViTHead(BaseModule):
                 nn.init.constant_(m.pred.bias, bias_init)
 
     def forward(self, batch_inputs: Tensor) -> Tuple[Tensor]:
-        features, features_map = batch_inputs
+        assert isinstance(batch_inputs, tuple) and len(batch_inputs) == 1
+        features_map = batch_inputs[0]
+        features = features_map.flatten(2).permute(0, 2, 1)
         layers_cls_scores = self.fc_cls(features)
         layers_bbox_preds = self.fc_reg(features)
         bias = compute_box_bias(features_map, kind='both')

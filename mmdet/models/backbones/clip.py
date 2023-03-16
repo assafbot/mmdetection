@@ -70,7 +70,7 @@ class ClipViT(BaseModule):
 
         n, _, c = features.shape
         features_map = features.reshape(n, *self.vit.grid_size, c).permute(0, 3, 1, 2)
-        return features, features_map
+        return tuple([features_map])
 
     def _freeze_stages(self):
         vit = self.vit
@@ -125,7 +125,7 @@ class ClipResNet(BaseModule):
                                    rn.avgpool)
         self.layers = ModuleList([stem, rn.layer1, rn.layer2, rn.layer3, rn.layer4])
         self.attnpool = rn.attnpool if use_attn_pool else None
-        self.out_indices = list(sorted(out_indices or [len(self.layers)-1]))
+        self.out_indices = list(sorted(out_indices or [len(self.layers)-1 if not use_attn_pool else len(self.layers)]))
         self.frozen_stages = frozen_stages
         self.norm_eval = norm_eval
 
