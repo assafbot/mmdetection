@@ -34,6 +34,11 @@ class ClearMLLoggerHook(Hook):
         # Use current task or create a new one
         self.task = self.clearml.Task.current_task() or self.clearml.Task.init(**task_kwargs)
 
+        assert runner.cfg.filename is not None and runner.work_dir is not None
+        cfg_dump_path = os.path.join(runner.work_dir, os.path.basename(runner.cfg.filename))
+        assert os.path.isfile(cfg_dump_path)
+        self.task.connect_configuration(cfg_dump_path, name='Config')
+
 
 @HOOKS.register_module()
 class ClearMLCheckpointHook(CheckpointHook):

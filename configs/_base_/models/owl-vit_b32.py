@@ -2,14 +2,15 @@ model = dict(
     type='OWLViT',
     data_preprocessor=dict(
         type='DetDataPreprocessor',
-        mean=[123.675, 116.28, 103.53],
-        std=[58.395, 57.12, 57.375],  # TODO: @assaf fix normalization?
+        mean=[122.7709383, 116.7460125, 104.09373615],
+        std=[68.5005327, 66.6321579, 70.32316305],
         bgr_to_rgb=True,
         pad_size_divisor=32),
     backbone=dict(
         type='ClipViT',
         model_name='ViT-B-32',
         pretrained='openai',
+        final_ln_post=False,
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
     bbox_head=dict(
         type='OWLViTHead',
