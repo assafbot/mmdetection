@@ -19,7 +19,4 @@ model = dict(
         norm_cfg=dict(type='BN', requires_grad=True),
         norm_eval=True,
         style='pytorch',
-        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
-    bbox_head=dict(
-        embed_dims=2048,
-    ))
+        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')))

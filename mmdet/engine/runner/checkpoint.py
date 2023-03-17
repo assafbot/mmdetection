@@ -24,12 +24,7 @@ def _download(local_filename, bucket_name, object_key):
 
 @CheckpointLoader.register_scheme(prefixes=('mentee://', ))
 def load_from_mentee(filename, map_location=None, force_download=False):
-    bucket_name = 'mentee-vision'
-    object_key = filename.replace('mentee://', '')
-    local_filename = filename.replace('mentee://', os.path.expanduser('~/.mentee/cache/'))
-
-    if force_download or not os.path.isfile(local_filename):
-        _download(local_filename, bucket_name, object_key)
+    local_filename = download_from_mentee(filename, force_download)
 
     barrier()
     try:
@@ -38,3 +33,14 @@ def load_from_mentee(filename, map_location=None, force_download=False):
         if force_download:
             raise
         return load_from_mentee(filename, map_location, force_download=True)
+
+
+def download_from_mentee(filename, force_download):
+    bucket_name = 'mentee-vision'
+    object_key = filename.replace('mentee://', '')
+    local_filename = filename.replace('mentee://', os.path.expanduser('~/.mentee/cache/'))
+
+    if force_download or not os.path.isfile(local_filename):
+        _download(local_filename, bucket_name, object_key)
+
+    return local_filename

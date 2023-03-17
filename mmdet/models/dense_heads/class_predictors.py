@@ -128,13 +128,14 @@ class AbstractClipClassPredictor(BaseModule):
     def forward(self, tensor):
         # if not hasattr(self, 'once') or not self.once:
         #     # class_names = DATASETS.get('CocoDataset').METAINFO['classes']
-        #     self.reduction = 'max'
-        #     self.templates = ['{}', 'a close-up photo of a {}.', 'a photo of the {}.', 'a photo of one {}.', 'a photo of a {}.',
-        #         'a photo of a small {}.', 'a photo of a large {}.', 'a photo of the small {}.', 'a photo of the large {}.']
+        #     # self.reduction = 'max'
+        #     # self.templates = ['{}', 'a close-up photo of a {}.', 'a photo of the {}.', 'a photo of one {}.', 'a photo of a {}.',
+        #     #     'a photo of a small {}.', 'a photo of a large {}.', 'a photo of the small {}.', 'a photo of the large {}.']
         #     # self.templates = ['{}', 'a photo of a {}.']
-        #     self.class_names = ['screen']  # * self.out_channels
+        #     self.class_names = ['woman']  # * self.out_channels
         #     self.class_names += [''] * (self.out_channels - len(self.class_names))
         #     print('Recomputing class names embeddings...', end='')
+        #     self.class_embeddings = None
         #     self._set_pred(self.class_names)
         #     print(' Done!')
         #     self.once = True

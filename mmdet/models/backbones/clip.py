@@ -125,6 +125,7 @@ class ClipResNet(BaseModule):
                                    rn.avgpool)
         self.layers = ModuleList([stem, rn.layer1, rn.layer2, rn.layer3, rn.layer4])
         self.attnpool = rn.attnpool if use_attn_pool else None
+        self.attnpool_ln = torch.nn.LayerNorm(self.attnpool.c_proj.out_features) if use_attn_pool else None
         self.out_indices = list(sorted(out_indices or [len(self.layers)-1 if not use_attn_pool else len(self.layers)]))
         self.frozen_stages = frozen_stages
         self.norm_eval = norm_eval
@@ -200,9 +201,11 @@ class ClipResNet(BaseModule):
                 training=ap.training,
                 need_weights=False
             )
+
+            x = self.attnpool_ln(x)
             features = x[1:]
-            # cls = x[:1]
-            # features = features * cls
+            cls = x[:1]
+            features = features * cls
             features = features.reshape(h, w, n, -1).permute(2, 3, 0, 1)
             outputs.append(features)
 

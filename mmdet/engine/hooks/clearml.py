@@ -1,6 +1,7 @@
 import os
 from typing import Optional, Dict
 
+import clearml
 from mmengine.dist import master_only
 from mmengine.hooks import Hook, CheckpointHook
 
@@ -38,6 +39,7 @@ class ClearMLLoggerHook(Hook):
         cfg_dump_path = os.path.join(runner.work_dir, os.path.basename(runner.cfg.filename))
         assert os.path.isfile(cfg_dump_path)
         self.task.connect_configuration(cfg_dump_path, name='Config')
+        self.task.upload_artifact('Config', cfg_dump_path)
 
 
 @HOOKS.register_module()
