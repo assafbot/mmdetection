@@ -890,6 +890,10 @@ class InferencerLoader(BaseTransform):
 
 @TRANSFORMS.register_module()
 class RemoveLVISRareLabels(BaseTransform):
+    def __init__(self, remove_objects=True, remove_labels=False):
+        self.remove_objects = remove_objects
+        self.remove_labels = remove_labels
+
     @autocast_box_type()
     def transform(self, results: dict) -> Union[dict, None]:
         assert 'instances' in results
@@ -897,9 +901,17 @@ class RemoveLVISRareLabels(BaseTransform):
         if len(instances) == 0:
             return results
 
-        classes = results['metainfo']['classes']
-        keep = [classes[instance['bbox_label']] not in LVISDataset.RARE_CLASSES for instance in instances]
-        return _filter_results(results, keep)
+        rare_labels = results['metainfo']['rare_labels']
+
+        if self.remove_labels:
+            results['neg_label_ids'] = list(filter(lambda x: x not in rare_labels, results['neg_label_ids']))
+            results['pos_label_ids'] = list(filter(lambda x: x not in rare_labels, results['pos_label_ids']))
+
+        if self.remove_objects:
+            keep = [instance['bbox_label'] not in rare_labels for instance in instances]
+            results = _filter_results(results, keep)
+
+        return results
 
     def __repr__(self):
         return self.__class__.__name__ + '()'

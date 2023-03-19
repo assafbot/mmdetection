@@ -4,7 +4,6 @@ import open_clip
 import torch
 from tqdm import tqdm
 
-from mmdet.datasets import LVISV1Dataset
 from mmdet.models.dense_heads.class_predictors import _canonicalize
 from mmdet.registry import DATASETS
 from mmdet.utils.clip import TRAINING_PROMPT_TEMPLATES
