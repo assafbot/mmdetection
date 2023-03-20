@@ -453,12 +453,19 @@ class OWLViTHead(BaseModule):
                 tmp[:, valid_cat_ids] = cls_score[:, valid_cat_ids]
                 cls_score = tmp
 
-            scores, indexes = cls_score.reshape(-1).topk(max_per_img)
-            det_labels = indexes % self.num_classes
-            bbox_index = indexes // self.num_classes
+            if 'query_mapping' in img_meta:
+                n = len(img_meta['query_mapping'])
+                scores, indexes = cls_score[:, :n].flatten().topk(max_per_img)
+                det_labels = indexes % n
+                bbox_index = indexes // n
+            else:
+                scores, indexes = cls_score.flatten().topk(max_per_img)
+                det_labels = indexes % self.num_classes
+                bbox_index = indexes // self.num_classes
             bbox_pred = bbox_pred[bbox_index]
         else:
-            assert not use_category_ids
+            assert not use_category_ids, 'need to implement'
+            assert 'query_mapping' not in img_meta, 'need to implement'
             scores, det_labels = F.softmax(cls_score, dim=-1)[..., :-1].max(-1)
             scores, bbox_index = scores.topk(max_per_img)
             bbox_pred = bbox_pred[bbox_index]

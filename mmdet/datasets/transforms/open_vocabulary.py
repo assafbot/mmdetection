@@ -1,4 +1,5 @@
-from typing import Union, Dict, Optional, Tuple, List
+from random import choice
+from typing import Union
 
 import numpy as np
 import open_clip
@@ -115,12 +116,16 @@ class AddQuerySet(BaseTransform):
 
 @TRANSFORMS.register_module()
 class ClipTokenizeQueries(BaseTransform):
-    def __init__(self, model_name):
+    def __init__(self, model_name, templates=None):
         self.tokenizer = open_clip.get_tokenizer(model_name)
+        self.templates = templates
 
     def transform(self, results: dict) -> Union[dict, None]:
         query = results['query']
         class_names = [results['metainfo']['classes'][q] if q >= 0 else '' for q in query]
+        if self.templates is not None:
+            class_names = [choice(self.templates).format(c) if c else c for c in class_names]
+
         tokens = self.tokenizer(class_names)
         results['query'] = tokens
         return results
