@@ -35,18 +35,35 @@ class ConvClassPredictor(BaseModule):
         self.conv = nn.Conv2d(in_channels, num_base_priors * out_channels,
                               kernel_size=kernel_size, padding=padding)
 
-    def forward(self, tensor):
+    def forward(self, tensor, query):
+        if query is not None:
+            raise NotImplementedError('need to support query')
         return self.conv(tensor)
 
 
 @MODELS.register_module()
 class LinearClassPredictor(BaseModule):
-    def __init__(self, in_channels, out_channels, init_cfg=None):
+    def __init__(self, in_channels, out_channels, init_cfg=None, num_outputs=None):
         super().__init__(init_cfg=init_cfg)
-        self.pred = nn.Linear(in_channels, out_channels)
+        self.pred = nn.Linear(in_channels, num_outputs if num_outputs is not None else out_channels)
+        self.out_channels = out_channels
 
-    def forward(self, tensor):
-        return self.pred(tensor)
+    def forward(self, tensor, query):
+        logits = self.pred(tensor)
+        if query is None:
+            return logits
+
+        assert query.shape[1] == self.out_channels
+
+        not_valid = query == -1
+        query = query.clone()
+        query[not_valid] = 0
+        idx = torch.arange(len(tensor), dtype=torch.int64)[:, None].repeat(1, query.shape[1])
+        idx = idx.to(query)
+        logits = logits[idx, :, query]
+        logits[not_valid] = 0
+        logits = logits.permute(0, 2, 1)
+        return logits
 
 
 class AbstractClipClassPredictor(BaseModule):
@@ -125,22 +142,24 @@ class AbstractClipClassPredictor(BaseModule):
             raise NotImplementedError(f'Unknown reduction: {self.reduction}')
         return tensor
 
-    def forward(self, tensor):
+    def forward(self, tensor, query):
         # if not hasattr(self, 'once') or not self.once:
         #     # class_names = DATASETS.get('CocoDataset').METAINFO['classes']
         #     # self.reduction = 'max'
         #     # self.templates = ['{}', 'a close-up photo of a {}.', 'a photo of the {}.', 'a photo of one {}.', 'a photo of a {}.',
         #     #     'a photo of a small {}.', 'a photo of a large {}.', 'a photo of the small {}.', 'a photo of the large {}.']
         #     # self.templates = ['{}', 'a photo of a {}.']
-        #     self.class_names = ['woman']  # * self.out_channels
-        #     self.class_names += [''] * (self.out_channels - len(self.class_names))
+        #     mapping = {'grape': 'grapes'}
+        #     self.class_names = [mapping.get(c, '') for c in self.class_names]
+        #     # self.class_names = ['cake']  # * self.out_channels
+        #     # self.class_names += [''] * (self.out_channels - len(self.class_names))
         #     print('Recomputing class names embeddings...', end='')
         #     self.class_embeddings = None
         #     self._set_pred(self.class_names)
         #     print(' Done!')
         #     self.once = True
 
-        return self._forward(tensor)
+        return self._forward(tensor, query)
 
     def pred(self, image_emb):
         if self.class_embeddings is not None:
@@ -155,7 +174,7 @@ class AbstractClipClassPredictor(BaseModule):
             logits = self._pred(image_emb)
         return logits
 
-    def _forward(self, tensor):
+    def _forward(self, tensor, query):
         raise NotImplementedError()
 
 
@@ -167,7 +186,10 @@ class ClipConvClassPredictor(AbstractClipClassPredictor):
         super().__init__(in_channels=in_channels, out_channels=out_channels, init_cfg=init_cfg, **kwargs)
         self.proj = nn.Conv2d(in_channels, num_base_priors * self.emb_dim, 3, padding=1)
 
-    def _forward(self, x):
+    def _forward(self, x, query):
+        if query is not None:
+            raise NotImplementedError('need to support query')
+
         image_emb = self.proj(x)
         n, c, h, w = image_emb.shape
         image_emb = image_emb.permute(0, 2, 3, 1).reshape(n, h, w, -1, self.emb_dim)
@@ -190,7 +212,10 @@ class ClipLinearClassPredictor(AbstractClipClassPredictor):
         super().__init__(in_channels=in_channels, out_channels=out_channels, init_cfg=init_cfg, **kwargs)
         self.proj = nn.Linear(in_channels, self.emb_dim)
 
-    def _forward(self, x):
+    def _forward(self, x, query):
+        if query is not None:
+            raise NotImplementedError('need to support query')
+
         image_emb = self.proj(x)
         if self.norm_image:
             image_emb = image_emb / (image_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
@@ -199,4 +224,67 @@ class ClipLinearClassPredictor(AbstractClipClassPredictor):
         logits = self.scale(logits, x)
         logits = self.reduce(logits)
 
+        return logits
+
+
+@MODELS.register_module()
+class LearnableClipLinearClassPredictor(BaseModule):
+    def __init__(self, in_channels, out_channels,
+                 model_name=None, pretrained=None, dataset_name='CocoDataset', class_names=None,
+                 canonicalize_text_labels=True, norm_text=True, norm_image=True, scale=True, bias=True, **kwargs):
+        super().__init__(**kwargs)
+        self.out_channels = out_channels
+        self.norm_image = norm_image
+        self.norm_text = norm_text
+        self.canonicalize_text_labels = canonicalize_text_labels
+
+        if model_name is None or pretrained is None:
+            raise ValueError(f'model_name and pretrained must be specified for {self.__class__.__name__}')
+
+        self.model = open_clip.create_model(model_name, pretrained=pretrained)
+        self.model.visual = None
+        self.model.logit_scale = None
+        self.tokenizer = open_clip.get_tokenizer(model_name)
+        self.emb_dim = self.model.text_projection.shape[1]
+
+        self.scale = ScaleLayer(scale=scale, bias=bias, in_channels=in_channels)
+        self.class_names = class_names or DATASETS.get(dataset_name).METAINFO['classes']
+
+        self.proj = nn.Linear(in_channels, self.emb_dim)
+
+        self.class_tokens = None
+        self._set_class_tokens(self.class_names)
+        self._freeze()
+
+    def train(self, mode=True):
+        super().train(mode)
+        self._freeze()
+
+    def _freeze(self):
+        for b in self.model.transformer.resblocks[:8]:
+            b.eval()
+            for p in b.parameters():
+                p.requires_grad = False
+
+    def _set_class_tokens(self, class_names):
+        if self.canonicalize_text_labels:
+            class_names = _canonicalize(class_names)
+
+        self.class_tokens = self.tokenizer(class_names)
+
+    def forward(self, x, query):
+        if query is not None:
+            raise NotImplementedError('need to support query')
+
+        self.class_tokens = self.class_tokens.to(x.device)
+        class_embeddings = self.model.encode_text(self.class_tokens)
+        if self.norm_text:
+            class_embeddings = class_embeddings / (class_embeddings.norm(p=2, dim=1, keepdim=True) + 1e-6)
+
+        image_emb = self.proj(x)
+        if self.norm_image:
+            image_emb = image_emb / (image_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
+
+        logits = image_emb @ class_embeddings.T
+        logits = self.scale(logits, x)
         return logits

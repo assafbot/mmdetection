@@ -48,7 +48,7 @@ class PackDetInputs(BaseTransform):
     def __init__(self, additional_input_keys=None,
                  meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
                             'scale_factor', 'flip', 'flip_direction')):
-        self.additional_inputs_keys = additional_input_keys
+        self.additional_input_keys = additional_input_keys
         self.meta_keys = meta_keys
 
     def transform(self, results: dict) -> dict:
@@ -135,10 +135,10 @@ class PackDetInputs(BaseTransform):
         data_sample.set_metainfo(img_meta)
         packed_results['data_samples'] = data_sample
 
-        for key in self.additional_inputs_keys or []:
+        for key in self.additional_input_keys or []:
             assert key in results, f'`{key}` is not found in `results`, ' \
                 f'the valid keys are {list(results)}.'
-            packed_results[key] = results[key]
+            packed_results[key] = to_tensor(results[key])
 
         return packed_results
 

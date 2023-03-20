@@ -164,11 +164,11 @@ class OWLViTHead(BaseModule):
             if isinstance(m, LinearClassPredictor):
                 nn.init.constant_(m.pred.bias, bias_init)
 
-    def forward(self, batch_inputs: Tensor) -> Tuple[Tensor]:
+    def forward(self, batch_inputs: Tensor, query: Tensor) -> Tuple[Tensor]:
         assert isinstance(batch_inputs, tuple) and len(batch_inputs) == 1
         features_map = batch_inputs[0]
         features = features_map.flatten(2).permute(0, 2, 1)
-        layers_cls_scores = self.fc_cls(features)
+        layers_cls_scores = self.fc_cls(features, query)
         layers_bbox_preds = self.fc_reg(features)
         bias = compute_box_bias(features_map, kind='both')
         bias = bias.reshape(1, -1, 4)
@@ -176,14 +176,14 @@ class OWLViTHead(BaseModule):
         layers_bbox_preds = layers_bbox_preds.sigmoid()
         return layers_cls_scores[None], layers_bbox_preds[None]
 
-    def loss(self, batch_inputs: Tensor, batch_data_samples: SampleList) -> dict:
+    def loss(self, batch_inputs: Tensor, batch_data_samples: SampleList, query: Tensor) -> dict:
         batch_gt_instances = []
         batch_img_metas = []
         for data_sample in batch_data_samples:
             batch_img_metas.append(data_sample.metainfo)
             batch_gt_instances.append(data_sample.gt_instances)
 
-        outs = self(batch_inputs)
+        outs = self(batch_inputs, query)
         loss_inputs = outs + (batch_gt_instances, batch_img_metas)
         losses = self.loss_by_feat(*loss_inputs)
         return losses
@@ -232,13 +232,12 @@ class OWLViTHead(BaseModule):
                                            batch_gt_instances, batch_img_metas)
         (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
          num_total_pos, num_total_neg) = cls_reg_targets
-        labels = torch.cat(labels_list, 0)
-        label_weights = torch.cat(label_weights_list, 0)
+        labels = torch.stack(labels_list, 0)
+        label_weights = torch.stack(label_weights_list, 0)
         bbox_targets = torch.cat(bbox_targets_list, 0)
         bbox_weights = torch.cat(bbox_weights_list, 0)
 
         # classification loss
-        cls_scores = cls_scores.reshape(-1, self.cls_out_channels)
         # construct weighted avg_factor to match with the official DETR repo
         cls_avg_factor = num_total_pos * 1.0 + \
             num_total_neg * self.bg_cls_weight
@@ -319,11 +318,16 @@ class OWLViTHead(BaseModule):
                                     dtype=torch.long)
         labels[pos_inds] = gt_labels[pos_assigned_gt_inds]
         if self.use_category_ids:
-            label_weights = gt_bboxes.new_zeros((num_bboxes, self.num_classes))
+            assert 'query_mapping' not in img_meta
+            label_weights = gt_bboxes.new_zeros((1, self.num_classes))
             valid_cat_ids = img_meta['pos_label_ids'] + img_meta['neg_label_ids']
             label_weights[:, valid_cat_ids] = 1
+        elif 'query_mapping' in img_meta:
+            n = len(img_meta['query_mapping'])
+            label_weights = torch.cat((gt_bboxes.new_ones((1, n)),
+                                       gt_bboxes.new_zeros((1, self.num_classes - n))), 1)
         else:
-            label_weights = gt_bboxes.new_ones(num_bboxes)
+            label_weights = gt_bboxes.new_ones((1, 1))
 
         # bbox targets
         bbox_targets = torch.zeros_like(bbox_pred)
@@ -355,9 +359,9 @@ class OWLViTHead(BaseModule):
         predictions = self.predict_by_feat(*outs, batch_img_metas=batch_img_metas)
         return losses, predictions
 
-    def predict(self, batch_inputs: Tuple[Tensor], batch_data_samples: SampleList, rescale: bool = True) -> InstanceList:
+    def predict(self, batch_inputs: Tuple[Tensor], batch_data_samples: SampleList, query: Tensor, rescale: bool = True) -> InstanceList:
         batch_img_metas = [data_samples.metainfo for data_samples in batch_data_samples]
-        outs = self(batch_inputs)
+        outs = self(batch_inputs, query)
         predictions = self.predict_by_feat(*outs, batch_img_metas=batch_img_metas, rescale=rescale)
 
         return predictions
@@ -438,6 +442,7 @@ class OWLViTHead(BaseModule):
         """
         assert len(cls_score) == len(bbox_pred)  # num_queries
         max_per_img = self.test_cfg.get('max_per_img', len(cls_score))
+        raise NotImplementedError('need to support query mapping')
         use_category_ids = self.test_cfg.get('use_category_ids', False)
         img_shape = img_meta['batch_input_shape']
         # exclude background

@@ -11,6 +11,7 @@ from .loading import (FilterAnnotations, InferencerLoader, LoadAnnotations,
                       LoadEmptyAnnotations, LoadImageFromNDArray,
                       LoadMultiChannelImageFromFiles, LoadPanopticAnnotations,
                       LoadProposals)
+from .open_vocabulary import AddQuerySet, RemoveLVISRareLabels, AddRandomNegatives, AddRandomNegativesV2
 from .transforms import (Albu, CachedMixUp, CachedMosaic, CopyPaste, CutOut,
                          Expand, FixShapeResize, MinIoURandomCrop, MixUp,
                          Mosaic, Pad, PhotoMetricDistortion, RandomAffine,
@@ -32,5 +33,6 @@ __all__ = [
     'RandAugment', 'Sharpness', 'Solarize', 'SolarizeAdd', 'Posterize',
     'AutoContrast', 'Invert', 'MultiBranch', 'RandomErasing',
     'LoadEmptyAnnotations', 'RandomOrder', 'CachedMosaic', 'CachedMixUp',
-    'FixShapeResize', 'ProposalBroadcaster', 'InferencerLoader'
+    'FixShapeResize', 'ProposalBroadcaster', 'InferencerLoader', 'AddQuerySet',
+    'RemoveLVISRareLabels', 'AddRandomNegatives', 'AddRandomNegativesV2'
 ]

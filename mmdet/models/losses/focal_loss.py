@@ -39,7 +39,17 @@ def py_sigmoid_focal_loss(pred,
                     (1 - target)) * pt.pow(gamma)
     loss = F.binary_cross_entropy_with_logits(
         pred, target, reduction='none') * focal_weight
+    weight = _fix_weight_shape(loss, weight)
+    loss = weight_reduce_loss(loss, weight, reduction, avg_factor)
+    return loss
+
+
+def _fix_weight_shape(loss, weight):
     if weight is not None:
+        if weight.ndim == loss.ndim:
+            assert all(ws == ls or ws == 1 for ws, ls in zip(weight.shape, loss.shape))
+            return weight
+
         if weight.shape != loss.shape:
             if weight.size(0) == loss.size(0):
                 # For most cases, weight is of shape (num_priors, ),
@@ -53,8 +63,8 @@ def py_sigmoid_focal_loss(pred,
                 assert weight.numel() == loss.numel()
                 weight = weight.view(loss.size(0), -1)
         assert weight.ndim == loss.ndim
-    loss = weight_reduce_loss(loss, weight, reduction, avg_factor)
-    return loss
+
+    return weight
 
 
 def py_focal_loss_with_prob(pred,
@@ -94,20 +104,7 @@ def py_focal_loss_with_prob(pred,
                     (1 - target)) * pt.pow(gamma)
     loss = F.binary_cross_entropy(
         pred, target, reduction='none') * focal_weight
-    if weight is not None:
-        if weight.shape != loss.shape:
-            if weight.size(0) == loss.size(0):
-                # For most cases, weight is of shape (num_priors, ),
-                #  which means it does not have the second axis num_class
-                weight = weight.view(-1, 1)
-            else:
-                # Sometimes, weight per anchor per class is also needed. e.g.
-                #  in FSAF. But it may be flattened of shape
-                #  (num_priors x num_class, ), while loss is still of shape
-                #  (num_priors, num_class).
-                assert weight.numel() == loss.numel()
-                weight = weight.view(loss.size(0), -1)
-        assert weight.ndim == loss.ndim
+    weight = _fix_weight_shape(loss, weight)
     loss = weight_reduce_loss(loss, weight, reduction, avg_factor)
     return loss
 
@@ -140,20 +137,7 @@ def sigmoid_focal_loss(pred,
     # "weighted_loss" is not applicable
     loss = _sigmoid_focal_loss(pred.contiguous(), target.contiguous(), gamma,
                                alpha, None, 'none')
-    if weight is not None:
-        if weight.shape != loss.shape:
-            if weight.size(0) == loss.size(0):
-                # For most cases, weight is of shape (num_priors, ),
-                #  which means it does not have the second axis num_class
-                weight = weight.view(-1, 1)
-            else:
-                # Sometimes, weight per anchor per class is also needed. e.g.
-                #  in FSAF. But it may be flattened of shape
-                #  (num_priors x num_class, ), while loss is still of shape
-                #  (num_priors, num_class).
-                assert weight.numel() == loss.numel()
-                weight = weight.view(loss.size(0), -1)
-        assert weight.ndim == loss.ndim
+    weight = _fix_weight_shape(loss, weight)
     loss = weight_reduce_loss(loss, weight, reduction, avg_factor)
     return loss
 
@@ -229,12 +213,12 @@ class FocalLoss(nn.Module):
                 if pred.dim() == target.dim():
                     # this means that target is already in One-Hot form.
                     calculate_loss_func = py_sigmoid_focal_loss
-                elif torch.cuda.is_available() and pred.is_cuda:
+                elif torch.cuda.is_available() and pred.is_cuda and pred.dim() == 2:
                     calculate_loss_func = sigmoid_focal_loss
                 else:
-                    num_classes = pred.size(1)
+                    num_classes = pred.size(-1)
                     target = F.one_hot(target, num_classes=num_classes + 1)
-                    target = target[:, :num_classes]
+                    target = target[..., :num_classes]
                     calculate_loss_func = py_sigmoid_focal_loss
 
             loss_cls = self.loss_weight * calculate_loss_func(
