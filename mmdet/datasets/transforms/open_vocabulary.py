@@ -73,7 +73,7 @@ class AddRandomNegativesV2(BaseTransform):
         enq_labels = pos_label_ids + neg_label_ids + cand_labels
         self.queue[cand_idx] = enq_labels[:self.total*2]
 
-        cand_negatives = list(set(cand_labels).difference(pos_label_ids))
+        cand_negatives = list(set(cand_labels).difference(pos_label_ids + neg_label_ids))
         np.random.shuffle(cand_negatives)
 
         new_negatives = neg_label_ids + cand_negatives
@@ -95,9 +95,10 @@ class AddQuerySet(BaseTransform):
     def transform(self, results: dict) -> Union[dict, None]:
         results.pop('not_exhaustive_label_ids', None)
         all_label_ids = results.pop('pos_label_ids') + results.pop('neg_label_ids')
-        mapping = {v: i for i, v in enumerate(set(all_label_ids))}
+        assert len(set(all_label_ids)) == len(all_label_ids)
+        mapping = {v: i for i, v in enumerate(all_label_ids)}
 
-        query = list(mapping)
+        query = all_label_ids
         query = query[:self.num_queries] + [-1] * max(0, self.num_queries - len(query))
         assert len(query) == self.num_queries
 
