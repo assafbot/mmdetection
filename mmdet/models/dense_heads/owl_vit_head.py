@@ -82,7 +82,7 @@ class OWLViTHead(BaseModule):
                         dict(type='BBoxL1Cost', weight=5.0, box_format='xywh'),
                         dict(type='IoUCost', iou_mode='giou', weight=2.0)
                     ])),
-            test_cfg: ConfigType = dict(max_per_img=100),
+            test_cfg: ConfigType = dict(max_per_img=100, use_category_ids=False),
             fc_cls=dict(type='LinearClassPredictor'),
             use_category_ids=False,
             init_cfg: OptMultiConfig = None) -> None:
@@ -438,15 +438,23 @@ class OWLViTHead(BaseModule):
         """
         assert len(cls_score) == len(bbox_pred)  # num_queries
         max_per_img = self.test_cfg.get('max_per_img', len(cls_score))
+        use_category_ids = self.test_cfg.get('use_category_ids', False)
         img_shape = img_meta['batch_input_shape']
         # exclude background
         if self.loss_cls.use_sigmoid:
             cls_score = cls_score.sigmoid()
+            if use_category_ids:
+                tmp = torch.zeros_like(cls_score)
+                valid_cat_ids = img_meta['pos_label_ids'] + img_meta['neg_label_ids']
+                tmp[:, valid_cat_ids] = cls_score[:, valid_cat_ids]
+                cls_score = tmp
+
             scores, indexes = cls_score.view(-1).topk(max_per_img)
             det_labels = indexes % self.num_classes
             bbox_index = indexes // self.num_classes
             bbox_pred = bbox_pred[bbox_index]
         else:
+            assert not use_category_ids
             scores, det_labels = F.softmax(cls_score, dim=-1)[..., :-1].max(-1)
             scores, bbox_index = scores.topk(max_per_img)
             bbox_pred = bbox_pred[bbox_index]
