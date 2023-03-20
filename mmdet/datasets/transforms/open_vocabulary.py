@@ -1,6 +1,8 @@
 from typing import Union, Dict, Optional, Tuple, List
 
 import numpy as np
+import open_clip
+import torch
 from mmcv.transforms import BaseTransform
 
 from mmdet.datasets.transforms.loading import _filter_results
@@ -92,16 +94,33 @@ class AddQuerySet(BaseTransform):
     def transform(self, results: dict) -> Union[dict, None]:
         results.pop('not_exhaustive_label_ids', None)
         all_label_ids = results.pop('pos_label_ids') + results.pop('neg_label_ids')
-        mapping = {v: i for i, v in enumerate(all_label_ids)}
+        mapping = {v: i for i, v in enumerate(set(all_label_ids))}
 
         query = list(mapping)
         query = query[:self.num_queries] + [-1] * max(0, self.num_queries - len(query))
         assert len(query) == self.num_queries
 
-        results['gt_bboxes_labels'] = np.array([mapping[l] for l in results['gt_bboxes_labels']])
+        results['gt_bboxes_labels'] = np.array([mapping[l] for l in results['gt_bboxes_labels']], dtype=np.int64)
         for instance in results['instances']:
             instance['bbox_label'] = mapping[instance['bbox_label']]
 
-        results['query'] = query
-        results['query_mapping'] = {i: v for v, i in mapping.items()}
+        results['query'] = np.asarray(query, dtype=np.int64)
+
+        query_mapping = torch.zeros(len(mapping), dtype=torch.int64)
+        for v, i in mapping.items():
+            query_mapping[i] = v
+        results['query_mapping'] = query_mapping
+        return results
+
+
+@TRANSFORMS.register_module()
+class ClipTokenizeQueries(BaseTransform):
+    def __init__(self, model_name):
+        self.tokenizer = open_clip.get_tokenizer(model_name)
+
+    def transform(self, results: dict) -> Union[dict, None]:
+        query = results['query']
+        class_names = [results['metainfo']['classes'][q] if q >= 0 else '' for q in query]
+        tokens = self.tokenizer(class_names)
+        results['query'] = tokens
         return results

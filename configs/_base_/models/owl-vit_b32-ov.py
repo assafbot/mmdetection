@@ -1,3 +1,6 @@
+model_name = 'ViT-B-32'
+pretrained = 'openai'
+
 model = dict(
     type='OWLViT',
     data_preprocessor=dict(
@@ -8,13 +11,12 @@ model = dict(
         pad_size_divisor=32),
     backbone=dict(
         type='ClipViT',
-        model_name='ViT-B-32',
-        pretrained='openai',
+        model_name=model_name,
+        pretrained=pretrained,
         final_ln_post=False,
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
     bbox_head=dict(
         type='OWLViTHead',
-        num_classes=1203,
         embed_dims=768,
         sync_cls_avg_factor=True,
         loss_cls=dict(

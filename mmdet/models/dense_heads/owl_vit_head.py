@@ -442,7 +442,6 @@ class OWLViTHead(BaseModule):
         """
         assert len(cls_score) == len(bbox_pred)  # num_queries
         max_per_img = self.test_cfg.get('max_per_img', len(cls_score))
-        raise NotImplementedError('need to support query mapping')
         use_category_ids = self.test_cfg.get('use_category_ids', False)
         img_shape = img_meta['batch_input_shape']
         # exclude background
@@ -454,7 +453,7 @@ class OWLViTHead(BaseModule):
                 tmp[:, valid_cat_ids] = cls_score[:, valid_cat_ids]
                 cls_score = tmp
 
-            scores, indexes = cls_score.view(-1).topk(max_per_img)
+            scores, indexes = cls_score.reshape(-1).topk(max_per_img)
             det_labels = indexes % self.num_classes
             bbox_index = indexes // self.num_classes
             bbox_pred = bbox_pred[bbox_index]
@@ -474,6 +473,11 @@ class OWLViTHead(BaseModule):
             assert img_meta.get('scale_factor') is not None
             det_bboxes /= det_bboxes.new_tensor(
                 img_meta['scale_factor']).repeat((1, 2))
+
+        if 'query_mapping' in img_meta:
+            query_mapping_ = img_meta['query_mapping']
+            query_mapping_ = query_mapping_.to(det_labels.device)
+            det_labels = query_mapping_[det_labels]
 
         results = InstanceData()
         results.bboxes = det_bboxes

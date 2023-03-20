@@ -228,15 +228,16 @@ class ClipLinearClassPredictor(AbstractClipClassPredictor):
 
 
 @MODELS.register_module()
-class LearnableClipLinearClassPredictor(BaseModule):
+class QueryClipLinearClassPredictor(BaseModule):
     def __init__(self, in_channels, out_channels,
-                 model_name=None, pretrained=None, dataset_name='CocoDataset', class_names=None,
-                 canonicalize_text_labels=True, norm_text=True, norm_image=True, scale=True, bias=True, **kwargs):
-        super().__init__(**kwargs)
+                 model_name=None, pretrained=None, freeze_text=False, norm_text=True, norm_image=True, scale=True, bias=True,
+                 init_cfg=[dict(type='Normal', layer='Conv2d', std=0.01),
+                           dict(type='Constant', layer='ScaleLayer', val=10, bias=bias_init_with_prob(0.01))]):
+        super().__init__(init_cfg=init_cfg)
         self.out_channels = out_channels
         self.norm_image = norm_image
         self.norm_text = norm_text
-        self.canonicalize_text_labels = canonicalize_text_labels
+        self.freeze_text = freeze_text
 
         if model_name is None or pretrained is None:
             raise ValueError(f'model_name and pretrained must be specified for {self.__class__.__name__}')
@@ -244,16 +245,11 @@ class LearnableClipLinearClassPredictor(BaseModule):
         self.model = open_clip.create_model(model_name, pretrained=pretrained)
         self.model.visual = None
         self.model.logit_scale = None
-        self.tokenizer = open_clip.get_tokenizer(model_name)
-        self.emb_dim = self.model.text_projection.shape[1]
 
+        emb_dim = self.model.text_projection.shape[1]
+        self.proj = nn.Linear(in_channels, emb_dim)
         self.scale = ScaleLayer(scale=scale, bias=bias, in_channels=in_channels)
-        self.class_names = class_names or DATASETS.get(dataset_name).METAINFO['classes']
 
-        self.proj = nn.Linear(in_channels, self.emb_dim)
-
-        self.class_tokens = None
-        self._set_class_tokens(self.class_names)
         self._freeze()
 
     def train(self, mode=True):
@@ -261,30 +257,25 @@ class LearnableClipLinearClassPredictor(BaseModule):
         self._freeze()
 
     def _freeze(self):
-        for b in self.model.transformer.resblocks[:8]:
-            b.eval()
-            for p in b.parameters():
-                p.requires_grad = False
+        if not self.freeze_text:
+            return
 
-    def _set_class_tokens(self, class_names):
-        if self.canonicalize_text_labels:
-            class_names = _canonicalize(class_names)
-
-        self.class_tokens = self.tokenizer(class_names)
+        self.model.eval()
+        for p in self.model.parameters():
+            p.requires_grad = False
 
     def forward(self, x, query):
-        if query is not None:
-            raise NotImplementedError('need to support query')
-
-        self.class_tokens = self.class_tokens.to(x.device)
-        class_embeddings = self.model.encode_text(self.class_tokens)
+        assert query.shape[1] == self.out_channels
+        n, q, _ = query.shape
+        text_emb = self.model.encode_text(query.flatten(0, 1))
+        text_emb = text_emb.view(n, q, -1)
         if self.norm_text:
-            class_embeddings = class_embeddings / (class_embeddings.norm(p=2, dim=1, keepdim=True) + 1e-6)
+            text_emb = text_emb / (text_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
 
         image_emb = self.proj(x)
         if self.norm_image:
             image_emb = image_emb / (image_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
 
-        logits = image_emb @ class_embeddings.T
+        logits = torch.einsum('...wc,...qc->...wq', image_emb, text_emb)
         logits = self.scale(logits, x)
         return logits
