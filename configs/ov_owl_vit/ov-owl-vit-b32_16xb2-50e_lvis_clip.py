@@ -19,3 +19,11 @@ model = dict(
             type='QueryClipLinearClassPredictor',
             model_name=_base_.model_name,
             pretrained=_base_.pretrained)))
+
+optim_wrapper = dict(
+    paramwise_cfg=dict(
+        _delete_=True,
+        custom_keys=dict({
+            'backbone': dict(lr_mult=0.1),
+            'bbox_head.fc_cls.model': dict(lr_mult=0.01)
+        })))
