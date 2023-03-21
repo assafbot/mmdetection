@@ -1,8 +1,11 @@
 # dataset settings
+from mmdet.datasets import LVISV1Dataset
+
 dataset_type = 'LVISV05Dataset'
 data_root = '/data/datasets/lvis/'
 
 num_queries = 100
+num_classes = 1203
 
 # file_client_args = dict(
 #     backend='petrel',
@@ -21,7 +24,7 @@ train_pipeline = [
                 (1333, 768), (1333, 800)],
         keep_ratio=True),
     dict(type='RandomFlip', prob=0.5),
-    dict(type='AddRandomNegativesV2', num_classes=1203, total=50),
+    dict(type='AddRandomNegativesV2', num_classes=num_classes, total=50),
     dict(type='RemoveLVISRareLabels', remove_labels=True),
     dict(type='AddQuerySet', num_queries=num_queries),
     dict(type='PackDetInputs', additional_input_keys=['query'],
@@ -33,7 +36,11 @@ test_pipeline = [
     dict(type='LoadImageFromFile', file_client_args=file_client_args),
     dict(type='Resize', scale=(1333, 800), keep_ratio=True),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='AddQuerySet', num_queries=num_queries),
+    dict(type='AddMissingKeys', pos_label_ids=list(range(num_classes)),
+         neg_label_ids=[],
+         not_exhaustive_label_ids=[],
+         metainfo=LVISV1Dataset.METAINFO),
+    dict(type='AddQuerySet', num_queries=None),
     dict(type='PackDetInputs', additional_input_keys=['query'],
          meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape', 'scale_factor',
                     # 'neg_label_ids', 'not_exhaustive_label_ids', 'pos_label_ids',

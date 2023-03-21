@@ -46,14 +46,11 @@ class LinearClassPredictor(BaseModule):
     def __init__(self, in_channels, out_channels, init_cfg=None, num_outputs=None):
         super().__init__(init_cfg=init_cfg)
         self.pred = nn.Linear(in_channels, num_outputs if num_outputs is not None else out_channels)
-        self.out_channels = out_channels
 
     def forward(self, tensor, query):
         logits = self.pred(tensor)
         if query is None:
             return logits
-
-        assert query.shape[1] == self.out_channels
 
         not_valid = query == -1
         query = query.clone()
@@ -234,7 +231,6 @@ class QueryClipLinearClassPredictor(BaseModule):
                  init_cfg=[dict(type='Normal', layer='Conv2d', std=0.01),
                            dict(type='Constant', layer='ScaleLayer', val=10, bias=bias_init_with_prob(0.01))]):
         super().__init__(init_cfg=init_cfg)
-        self.out_channels = out_channels
         self.norm_image = norm_image
         self.norm_text = norm_text
         self.freeze_text = freeze_text
@@ -265,7 +261,7 @@ class QueryClipLinearClassPredictor(BaseModule):
             p.requires_grad = False
 
     def forward(self, x, query):
-        assert query.shape[1] == self.out_channels
+        n, q, e, _ = query.shape
         n, q, _ = query.shape
         text_emb = self.model.encode_text(query.flatten(0, 1))
         text_emb = text_emb.view(n, q, -1)

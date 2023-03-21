@@ -10,7 +10,7 @@ model = dict(
         num_classes=_base_.num_queries,
         fc_cls=dict(
             type='LinearClassPredictor',
-            num_outputs=1203
+            num_outputs=_base_.num_classes
         )
     )
 )

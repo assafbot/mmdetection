@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from copy import deepcopy
 from typing import Optional, Tuple, Union
 
 import mmcv
@@ -884,3 +885,18 @@ class InferencerLoader(BaseTransform):
         if 'img' in inputs:
             return self.from_ndarray(inputs)
         return self.from_file(inputs)
+
+
+@TRANSFORMS.register_module()
+class AddMissingKeys(BaseTransform):
+    def __init__(self, **keys):
+        self.keys = keys
+
+    def transform(self, results: Union[str, np.ndarray, dict]) -> dict:
+        for key, value in self.keys.items():
+            if key in results:
+                continue
+
+            results[key] = deepcopy(value)
+
+        return results
