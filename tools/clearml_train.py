@@ -10,7 +10,7 @@ def main():
     parser.add_argument('config', help='train config file path')
     parser.add_argument('--task-name', help='clearml task name', default=None)
     parser.add_argument('--project-name', help='clearml project name', default='mmdetection')
-    parser.add_argument('--queue', help='clearml queue', default='default')
+    parser.add_argument('--queue', help='clearml queue', default=None)
     args, unknownargs = parser.parse_known_args()
 
     assert os.path.isfile(args.config), f'{args.config} does not exist'
@@ -20,7 +20,8 @@ def main():
     unknownargs = ' '.join(unknownargs)
     unknownargs = task.connect({'args': unknownargs})['args']
 
-    task.execute_remotely(queue_name=args.queue)
+    if args.queue is not None:
+        task.execute_remotely(queue_name=args.queue)
 
     if task is not None:
         if 'Config' in task.get_configuration_objects().keys():
