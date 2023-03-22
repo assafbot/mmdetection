@@ -49,9 +49,13 @@ class AddRandomNegatives(BaseTransform):
 
     def transform(self, results: dict) -> Union[dict, None]:
         needed = max(0, self.total - len(results['neg_label_ids']))
-        rand_negs = np.random.randint(self.num_classes, size=self.total*2)
-        rand_negs = [x for x in rand_negs if x not in results['pos_label_ids']]
-        results['neg_label_ids'].extend(rand_negs[:needed])
+        if needed != 0:
+            rand_negs = np.random.randint(self.num_classes, size=self.total*2)
+            rand_negs = [x for x in rand_negs if x not in results['pos_label_ids']]
+            results['neg_label_ids'].extend(rand_negs[:needed])
+        else:
+            results['neg_label_ids'] = results['neg_label_ids'][:self.total]
+
         return results
 
     def __repr__(self):
@@ -71,10 +75,11 @@ class AddRandomNegativesV2(BaseTransform):
         cand_labels = self.queue[cand_idx].tolist()
         pos_label_ids = results['pos_label_ids']
         neg_label_ids = results['neg_label_ids']
+        not_exhaustive_label_ids = results['not_exhaustive_label_ids']
         enq_labels = pos_label_ids + neg_label_ids + cand_labels
         self.queue[cand_idx] = enq_labels[:self.total*2]
 
-        cand_negatives = list(set(cand_labels).difference(pos_label_ids + neg_label_ids))
+        cand_negatives = list(set(cand_labels).difference(pos_label_ids + neg_label_ids + not_exhaustive_label_ids))
         np.random.shuffle(cand_negatives)
 
         new_negatives = neg_label_ids + cand_negatives
@@ -94,8 +99,7 @@ class AddQuerySet(BaseTransform):
         self.num_queries = num_queries
 
     def transform(self, results: dict) -> Union[dict, None]:
-        results.pop('not_exhaustive_label_ids', None)
-        all_label_ids = results.pop('pos_label_ids') + results.pop('neg_label_ids')
+        all_label_ids = results['pos_label_ids'] + results['neg_label_ids']
         assert len(set(all_label_ids)) == len(all_label_ids)
         mapping = {v: i for i, v in enumerate(all_label_ids)}
 
@@ -109,6 +113,10 @@ class AddQuerySet(BaseTransform):
             instance['bbox_label'] = mapping[instance['bbox_label']]
 
         results['query'] = np.asarray(query, dtype=np.int64)
+
+        results['pos_label_ids'] = [mapping[l] for l in results['pos_label_ids']]
+        results['neg_label_ids'] = [mapping[l] for l in results['neg_label_ids']]
+        results['not_exhaustive_label_ids'] = [mapping[l] for l in results['not_exhaustive_label_ids']]
 
         query_mapping = torch.zeros(len(mapping), dtype=torch.int64)
         for v, i in mapping.items():
