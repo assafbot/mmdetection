@@ -9,6 +9,7 @@ from mmcv.transforms import BaseTransform
 from mmdet.datasets.transforms.loading import _filter_results
 from mmdet.registry import TRANSFORMS
 from mmdet.structures.bbox.box_type import autocast_box_type
+from mmdet.utils.clip import canonicalize
 
 
 @TRANSFORMS.register_module()
@@ -99,11 +100,12 @@ class AddQuerySet(BaseTransform):
         mapping = {v: i for i, v in enumerate(all_label_ids)}
 
         query = all_label_ids
-        query = query[:self.num_queries] + [-1] * max(0, self.num_queries - len(query))
-        assert len(query) == self.num_queries
+        if self.num_queries is not None:
+            query = query[:self.num_queries] + [-1] * max(0, self.num_queries - len(query))
+            assert len(query) == self.num_queries
 
         results['gt_bboxes_labels'] = np.array([mapping[l] for l in results['gt_bboxes_labels']], dtype=np.int64)
-        for instance in results['instances']:
+        for instance in results.get('instances', []):
             instance['bbox_label'] = mapping[instance['bbox_label']]
 
         results['query'] = np.asarray(query, dtype=np.int64)
@@ -117,16 +119,30 @@ class AddQuerySet(BaseTransform):
 
 @TRANSFORMS.register_module()
 class ClipTokenizeQueries(BaseTransform):
-    def __init__(self, model_name, templates=None):
+    def __init__(self, model_name, templates=None, mode=None, canonicalize=False):
         self.tokenizer = open_clip.get_tokenizer(model_name)
         self.templates = templates
+        self.canonicalize = canonicalize
+        self.mode = mode
 
     def transform(self, results: dict) -> Union[dict, None]:
         query = results['query']
         class_names = [results['metainfo']['classes'][q] if q >= 0 else '' for q in query]
+
+        ensemble_size = 1
         if self.templates is not None:
-            class_names = [choice(self.templates).format(c) if c else c for c in class_names]
+            if self.mode == 'random':
+                class_names = [choice(self.templates).format(c) if c else c for c in class_names]
+            elif self.mode == 'ensemble':
+                class_names = [t.format(c) if c else c for c in class_names for t in self.templates]
+                ensemble_size = len(self.templates)
+            else:
+                raise ValueError(f'Unknown mode {self.mode}')
+
+        if self.canonicalize:
+            class_names = canonicalize(class_names)
 
         tokens = self.tokenizer(class_names)
+        tokens = tokens.reshape(len(query), ensemble_size, -1)
         results['query'] = tokens
         return results

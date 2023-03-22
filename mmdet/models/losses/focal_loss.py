@@ -37,8 +37,7 @@ def py_sigmoid_focal_loss(pred,
     pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)
     focal_weight = (alpha * target + (1 - alpha) *
                     (1 - target)) * pt.pow(gamma)
-    loss = F.binary_cross_entropy_with_logits(
-        pred, target, reduction='none') * focal_weight
+    loss = F.binary_cross_entropy_with_logits(pred, target, reduction='none') * focal_weight
     weight = _fix_weight_shape(loss, weight)
     loss = weight_reduce_loss(loss, weight, reduction, avg_factor)
     return loss

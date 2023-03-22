@@ -4,9 +4,8 @@ import open_clip
 import torch
 from tqdm import tqdm
 
-from mmdet.models.dense_heads.class_predictors import _canonicalize
 from mmdet.registry import DATASETS
-from mmdet.utils.clip import TRAINING_PROMPT_TEMPLATES
+from mmdet.utils.clip import TRAINING_PROMPT_TEMPLATES, canonicalize
 
 
 def create_class_embeddings(dataset, model_name, pretrained, normalize):
@@ -21,7 +20,7 @@ def create_class_embeddings(dataset, model_name, pretrained, normalize):
         class_embeddings = []
         for template in tqdm(templates):
             texts = [template.format(class_name) for class_name in class_names]
-            texts = _canonicalize(texts)
+            texts = canonicalize(texts)
             embs = model.encode_text(tokenizer(texts), normalize=normalize).T
             class_embeddings.append(embs[None])
 

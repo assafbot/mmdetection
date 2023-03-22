@@ -1,5 +1,6 @@
-# From
-# https://github.com/openai/CLIP/blob/main/notebooks/Prompt_Engineering_for_ImageNet.ipynb
+import re
+
+# From https://github.com/openai/CLIP/blob/main/notebooks/Prompt_Engineering_for_ImageNet.ipynb
 CLIP_BEST_PROMPT_TEMPLATES = [
     'itap of a {}.',
     'a bad photo of the {}.',
@@ -10,8 +11,7 @@ CLIP_BEST_PROMPT_TEMPLATES = [
     'a photo of the small {}.',
 ]
 
-# From
-# https://github.com/openai/CLIP/blob/main/notebooks/Prompt_Engineering_for_ImageNet.ipynb
+# From https://github.com/openai/CLIP/blob/main/notebooks/Prompt_Engineering_for_ImageNet.ipynb
 CLIP_PAPER_PROMPT_TEMPLATES = [
     'a bad photo of a {}.',
     'a photo of many {}.',
@@ -96,3 +96,16 @@ CLIP_PAPER_PROMPT_TEMPLATES = [
 ]
 
 TRAINING_PROMPT_TEMPLATES = ['{}'] + CLIP_PAPER_PROMPT_TEMPLATES
+
+
+def canonicalize(class_names):
+    new_class_names = []
+    for class_name in class_names:
+        class_name = class_name.lower()
+        class_name = re.sub(f'[^a-z0-9- ]', ' ', class_name)
+        class_name = re.sub(r'\s+', ' ', class_name)
+        class_name = re.sub(r'-+', '-', class_name)
+        class_name = class_name.strip()
+        new_class_names.append(class_name)
+
+    return new_class_names

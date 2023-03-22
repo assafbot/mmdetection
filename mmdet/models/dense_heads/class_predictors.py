@@ -1,29 +1,15 @@
-import re
-
 import torch
 from mmengine.model import BaseModule, bias_init_with_prob
 from torch import nn
 
 from mmdet.models.layers.scale import ScaleLayer
 from mmdet.registry import MODELS, DATASETS
+from mmdet.utils.clip import canonicalize
 
 try:
     import open_clip
 except ImportError:
     open_clip = None
-
-
-def _canonicalize(class_names):
-    new_class_names = []
-    for class_name in class_names:
-        class_name = class_name.lower()
-        class_name = re.sub(f'[^a-z0-9- ]', ' ', class_name)
-        class_name = re.sub(r'\s+', ' ', class_name)
-        class_name = re.sub(r'-+', '-', class_name)
-        class_name = class_name.strip()
-        new_class_names.append(class_name)
-
-    return new_class_names
 
 
 @MODELS.register_module()
@@ -113,7 +99,7 @@ class AbstractClipClassPredictor(BaseModule):
 
     def _get_class_embeddings(self, class_names):
         if self.canonicalize_text_labels:
-            class_names = _canonicalize(class_names)
+            class_names = canonicalize(class_names)
 
         with torch.no_grad():
             # TODO: @assaf support any dataset / dynamic input
@@ -228,12 +214,14 @@ class ClipLinearClassPredictor(AbstractClipClassPredictor):
 class QueryClipLinearClassPredictor(BaseModule):
     def __init__(self, in_channels, out_channels,
                  model_name=None, pretrained=None, freeze_text=False, norm_text=True, norm_image=True, scale=True, bias=True,
+                 ensemble_mode='avg',
                  init_cfg=[dict(type='Normal', layer='Conv2d', std=0.01),
                            dict(type='Constant', layer='ScaleLayer', val=10, bias=bias_init_with_prob(0.01))]):
         super().__init__(init_cfg=init_cfg)
         self.norm_image = norm_image
         self.norm_text = norm_text
         self.freeze_text = freeze_text
+        self.ensemble_mode = ensemble_mode
 
         if model_name is None or pretrained is None:
             raise ValueError(f'model_name and pretrained must be specified for {self.__class__.__name__}')
@@ -262,9 +250,8 @@ class QueryClipLinearClassPredictor(BaseModule):
 
     def forward(self, x, query):
         n, q, e, _ = query.shape
-        n, q, _ = query.shape
-        text_emb = self.model.encode_text(query.flatten(0, 1))
-        text_emb = text_emb.view(n, q, -1)
+        text_emb = self.model.encode_text(query.flatten(0, 2))
+        text_emb = text_emb.view(n, q, e, -1)
         if self.norm_text:
             text_emb = text_emb / (text_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
 
@@ -272,6 +259,17 @@ class QueryClipLinearClassPredictor(BaseModule):
         if self.norm_image:
             image_emb = image_emb / (image_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
 
-        logits = torch.einsum('...wc,...qc->...wq', image_emb, text_emb)
+        logits = torch.einsum('...wc,...qec->...weq', image_emb, text_emb)
         logits = self.scale(logits, x)
+
+        n, w, e, q = logits.shape
+        if e == 1:
+            logits = logits.view(n, w, q)
+        elif self.ensemble_mode == 'avg':
+            logits = logits.mean(2)
+        elif self.ensemble_mode == 'max':
+            logits = logits.max(2)[0]
+        else:
+            raise ValueError(f'Unknowm ensemble mode {self.ensemble_mode}')
+
         return logits
