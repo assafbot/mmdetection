@@ -29,7 +29,7 @@ train_pipeline = [
     dict(type='AddQuerySet', num_queries=num_queries),
     dict(type='PackDetInputs', additional_input_keys=['query'],
          meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape', 'scale_factor', 'flip', 'flip_direction',
-                    # 'neg_label_ids', 'not_exhaustive_label_ids', 'pos_label_ids',
+                    'not_exhaustive_label_ids',  # 'neg_label_ids', 'pos_label_ids',
                     'query_mapping'))
 ]
 test_pipeline = [

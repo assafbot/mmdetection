@@ -85,11 +85,12 @@ class OWLViTHead(BaseModule):
                     ])),
             test_cfg: ConfigType = dict(max_per_img=100, use_category_ids=False),
             fc_cls=dict(type='LinearClassPredictor'),
-            use_category_ids=False,
+            use_category_ids=False, ignore_non_exhaustive_falses=False,
             init_cfg: OptMultiConfig = None) -> None:
         super().__init__(init_cfg=init_cfg)
         self.bg_cls_weight = 0
         self.sync_cls_avg_factor = sync_cls_avg_factor
+        self.ignore_non_exhaustive_falses = ignore_non_exhaustive_falses
 
         class_weight = loss_cls.get('class_weight', None)
         if class_weight is not None:
@@ -329,6 +330,12 @@ class OWLViTHead(BaseModule):
                                        gt_bboxes.new_zeros((1, self.num_classes - n))), 1)
         else:
             label_weights = gt_bboxes.new_ones((1, 1))
+
+        if self.ignore_non_exhaustive_falses:
+            w1, c1 = cls_score.shape
+            w2, c2 = label_weights.shape
+            label_weights = label_weights.repeat(w1//w2, c1//c2)
+            label_weights[neg_inds, img_meta['not_exhaustive_label_ids']] = 0
 
         # bbox targets
         bbox_targets = torch.zeros_like(bbox_pred)

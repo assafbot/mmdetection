@@ -116,7 +116,7 @@ class AddQuerySet(BaseTransform):
 
         results['pos_label_ids'] = [mapping[l] for l in results['pos_label_ids']]
         results['neg_label_ids'] = [mapping[l] for l in results['neg_label_ids']]
-        results['not_exhaustive_label_ids'] = [mapping[l] for l in results['not_exhaustive_label_ids']]
+        results['not_exhaustive_label_ids'] = [mapping[l] for l in results['not_exhaustive_label_ids'] if l in mapping]
 
         query_mapping = torch.zeros(len(mapping), dtype=torch.int64)
         for v, i in mapping.items():
