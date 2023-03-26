@@ -1,4 +1,4 @@
-_base_ = 'ov-owl-vit-b32_16xb2-50e_lvis_clip.py'
+_base_ = 'ov-owl-vit-b32_16xb2-50e_lvis_clip_freezeText.py'
 
 _base_.custom_hooks += [
     dict(type='EMAHookV2',

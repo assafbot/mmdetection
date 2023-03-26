@@ -6,6 +6,8 @@ import clearml
 
 
 def main():
+    clearml.Task.add_requirements('protobuf', '3.20.3')
+
     parser = argparse.ArgumentParser(description='Train a detector')
     parser.add_argument('config', help='train config file path')
     parser.add_argument('--task-name', help='clearml task name', default=None)

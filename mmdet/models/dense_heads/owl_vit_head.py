@@ -335,7 +335,7 @@ class OWLViTHead(BaseModule):
             w1, c1 = cls_score.shape
             w2, c2 = label_weights.shape
             label_weights = label_weights.repeat(w1//w2, c1//c2)
-            label_weights[neg_inds, img_meta['not_exhaustive_label_ids']] = 0
+            label_weights[neg_inds][:, img_meta['not_exhaustive_label_ids']] = 0
 
         # bbox targets
         bbox_targets = torch.zeros_like(bbox_pred)
