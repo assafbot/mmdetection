@@ -230,8 +230,8 @@ class QueryClipLinearClassPredictor(BaseModule):
         self.model.visual = None
         self.model.logit_scale = None
 
-        emb_dim = self.model.text_projection.shape[1]
-        self.proj = nn.Linear(in_channels, emb_dim)
+        self.emb_dim = self.model.text_projection.shape[1]
+        self.proj = nn.Linear(in_channels, self.emb_dim)
         self.scale = ScaleLayer(scale=scale, bias=bias, in_channels=in_channels)
 
         self._freeze()
@@ -249,11 +249,10 @@ class QueryClipLinearClassPredictor(BaseModule):
             p.requires_grad = False
 
     def forward(self, x, query):
-        n, q, e, _ = query.shape
-        text_emb = self.model.encode_text(query.flatten(0, 2))
-        text_emb = text_emb.view(n, q, e, -1)
-        if self.norm_text:
-            text_emb = text_emb / (text_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
+        if query.shape[3] != self.emb_dim:
+            text_emb = self.encode_query(query)
+        else:
+            text_emb = query
 
         image_emb = self.proj(x)
         if self.norm_image:
@@ -273,3 +272,11 @@ class QueryClipLinearClassPredictor(BaseModule):
             raise ValueError(f'Unknowm ensemble mode {self.ensemble_mode}')
 
         return logits
+
+    def encode_query(self, query):
+        n, q, e, _ = query.shape
+        text_emb = self.model.encode_text(query.flatten(0, 2))
+        text_emb = text_emb.view(n, q, e, -1)
+        if self.norm_text:
+            text_emb = text_emb / (text_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
+        return text_emb
