@@ -2,7 +2,7 @@
 dataset_type = 'CocoDataset'
 data_root = '/data/datasets/coco/'
 
-num_queries = 100
+num_queries = 80
 num_classes = 80
 
 # file_client_args = dict(
