@@ -99,11 +99,14 @@ class AddQuerySet(BaseTransform):
         self.num_queries = num_queries
 
     def transform(self, results: dict) -> Union[dict, None]:
-        all_label_ids = results['pos_label_ids'] + results['neg_label_ids']
-        assert len(set(all_label_ids)) == len(all_label_ids)
-        mapping = {v: i for i, v in enumerate(all_label_ids)}
+        mapping = {}
+        query = []
+        for i, v in enumerate(results['pos_label_ids'] + results['neg_label_ids']):
+            if v in mapping:
+                continue
+            mapping[v] = len(query)
+            query.append(v)
 
-        query = all_label_ids
         if self.num_queries is not None:
             query = query[:self.num_queries] + [-1] * max(0, self.num_queries - len(query))
             assert len(query) == self.num_queries
