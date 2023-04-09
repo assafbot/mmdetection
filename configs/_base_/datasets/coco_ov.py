@@ -2,8 +2,7 @@
 dataset_type = 'CocoDataset'
 data_root = '/data/datasets/coco/'
 
-num_queries = 80
-num_classes = 80
+num_queries = num_classes = 80
 
 # file_client_args = dict(
 #     backend='petrel',
@@ -11,6 +10,7 @@ num_classes = 80
 #         './data/': 's3://openmmlab/datasets/detection/',
 #         'data/': 's3://openmmlab/datasets/detection/'
 #     }))
+
 file_client_args = dict(backend='disk')
 
 train_pipeline = [
