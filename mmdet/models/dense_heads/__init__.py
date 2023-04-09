@@ -8,12 +8,13 @@ from .cascade_rpn_head import CascadeRPNHead, StageCascadeRPNHead
 from .centernet_head import CenterNetHead
 from .centernet_update_head import CenterNetUpdateHead
 from .centripetal_head import CentripetalHead
+from .class_predictors import ConvClassPredictor
+from .clip_head import ClipHead
 from .condinst_head import CondInstBboxHead, CondInstMaskHead
 from .conditional_detr_head import ConditionalDETRHead
 from .corner_head import CornerHead
 from .dab_detr_head import DABDETRHead
 from .ddod_head import DDODHead
-from .clip_head import ClipHead
 from .deformable_detr_head import DeformableDETRHead
 from .detr_head import DETRHead
 from .dino_head import DINOHead
@@ -31,6 +32,7 @@ from .ld_head import LDHead
 from .mask2former_head import Mask2FormerHead
 from .maskformer_head import MaskFormerHead
 from .nasfcos_head import NASFCOSHead
+from .owl_vit_head import OWLViTHead
 from .paa_head import PAAHead
 from .pisa_retinanet_head import PISARetinaHead
 from .pisa_ssd_head import PISASSDHead
@@ -66,5 +68,5 @@ __all__ = [
     'CenterNetUpdateHead', 'RTMDetHead', 'RTMDetSepBNHead', 'CondInstBboxHead',
     'CondInstMaskHead', 'RTMDetInsHead', 'RTMDetInsSepBNHead',
     'BoxInstBboxHead', 'BoxInstMaskHead', 'ConditionalDETRHead', 'DINOHead',
-    'DABDETRHead', 'ClipHead'
+    'DABDETRHead', 'ClipHead', 'ConvClassPredictor', 'OWLViTHead'
 ]

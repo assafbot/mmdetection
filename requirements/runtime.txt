@@ -8,3 +8,7 @@ transformers
 open_clip_torch
 future
 tensorboard
+clearml
+boto3
+#git+https://github.com/assafbot/lvis-api.git
+visual-genome==1.1.1

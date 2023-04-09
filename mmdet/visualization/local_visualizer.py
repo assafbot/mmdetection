@@ -366,6 +366,11 @@ class DetLocalVisualizer(Visualizer):
                 pred_instances = data_sample.pred_instances
                 pred_instances = pred_instances[
                     pred_instances.scores > pred_score_thr]
+
+                # Sort from low to high scores to make sure strongest detections are visible
+                _, idx = pred_instances.scores.sort()
+                pred_instances = pred_instances[idx]
+
                 pred_img_data = self._draw_instances(image, pred_instances,
                                                      classes, palette)
             if 'pred_panoptic_seg' in data_sample:

@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import copy
 from typing import Dict, List, Tuple
 
 import torch
@@ -71,6 +72,8 @@ class DETRHead(BaseModule):
                         dict(type='IoUCost', iou_mode='giou', weight=2.0)
                     ])),
             test_cfg: ConfigType = dict(max_per_img=100),
+            fc_cls=dict(type='LinearClassPredictor'),
+            use_category_ids=False,
             init_cfg: OptMultiConfig = None) -> None:
         super().__init__(init_cfg=init_cfg)
         self.bg_cls_weight = 0
@@ -109,6 +112,8 @@ class DETRHead(BaseModule):
         self.loss_cls = MODELS.build(loss_cls)
         self.loss_bbox = MODELS.build(loss_bbox)
         self.loss_iou = MODELS.build(loss_iou)
+        self.fc_cls = fc_cls
+        self.use_category_ids = use_category_ids
 
         if self.loss_cls.use_sigmoid:
             self.cls_out_channels = num_classes
@@ -120,7 +125,9 @@ class DETRHead(BaseModule):
     def _init_layers(self) -> None:
         """Initialize layers of the transformer head."""
         # cls branch
-        self.fc_cls = Linear(self.embed_dims, self.cls_out_channels)
+        self.fc_cls = copy.deepcopy(self.fc_cls)
+        self.fc_cls.update({'in_channels': self.embed_dims, 'out_channels': self.cls_out_channels})
+        self.fc_cls = MODELS.build(self.fc_cls)
         # reg branch
         self.activate = nn.ReLU()
         self.reg_ffn = FFN(
@@ -422,7 +429,12 @@ class DETRHead(BaseModule):
                                     self.num_classes,
                                     dtype=torch.long)
         labels[pos_inds] = gt_labels[pos_assigned_gt_inds]
-        label_weights = gt_bboxes.new_ones(num_bboxes)
+        if self.use_category_ids:
+            label_weights = gt_bboxes.new_zeros((num_bboxes, self.num_classes))
+            valid_cat_ids = img_meta['pos_label_ids'] + img_meta['neg_label_ids']
+            label_weights[:, valid_cat_ids] = 1
+        else:
+            label_weights = gt_bboxes.new_ones(num_bboxes)
 
         # bbox targets
         bbox_targets = torch.zeros_like(bbox_pred)

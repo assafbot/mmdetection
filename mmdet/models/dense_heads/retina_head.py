@@ -1,4 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from copy import deepcopy
+
 import torch.nn as nn
 from mmcv.cnn import ConvModule
 
@@ -30,6 +32,8 @@ class RetinaHead(AnchorHead):
                  num_classes,
                  in_channels,
                  stacked_convs=4,
+                 stacked_cls_convs=None,
+                 stacked_reg_convs=None,
                  conv_cfg=None,
                  norm_cfg=None,
                  anchor_generator=dict(
@@ -41,19 +45,22 @@ class RetinaHead(AnchorHead):
                  init_cfg=dict(
                      type='Normal',
                      layer='Conv2d',
-                     std=0.01,
-                     override=dict(
-                         type='Normal',
-                         name='retina_cls',
-                         std=0.01,
-                         bias_prob=0.01)),
+                     std=0.01),
+                 retina_cls=dict(type='ConvClassPredictor', kernel_size=3, padding=1),
                  **kwargs):
-        assert stacked_convs >= 0, \
-            '`stacked_convs` must be non-negative integers, ' \
-            f'but got {stacked_convs} instead.'
-        self.stacked_convs = stacked_convs
+        if stacked_cls_convs is None and stacked_reg_convs is None:
+            assert stacked_convs >= 0, \
+                '`stacked_convs` must be non-negative integers, ' \
+                f'but got {stacked_convs} instead.'
+            self.stacked_cls_convs = self.stacked_reg_convs = stacked_convs
+        else:
+            assert stacked_cls_convs is not None and stacked_reg_convs is not None and stacked_convs is None
+            self.stacked_cls_convs = stacked_cls_convs
+            self.stacked_reg_convs = stacked_reg_convs
+
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
+        self.retina_cls = retina_cls
         super(RetinaHead, self).__init__(
             num_classes,
             in_channels,
@@ -67,7 +74,7 @@ class RetinaHead(AnchorHead):
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
         in_channels = self.in_channels
-        for i in range(self.stacked_convs):
+        for i in range(self.stacked_cls_convs):
             self.cls_convs.append(
                 ConvModule(
                     in_channels,
@@ -77,6 +84,7 @@ class RetinaHead(AnchorHead):
                     padding=1,
                     conv_cfg=self.conv_cfg,
                     norm_cfg=self.norm_cfg))
+        for i in range(self.stacked_reg_convs):
             self.reg_convs.append(
                 ConvModule(
                     in_channels,
@@ -87,11 +95,12 @@ class RetinaHead(AnchorHead):
                     conv_cfg=self.conv_cfg,
                     norm_cfg=self.norm_cfg))
             in_channels = self.feat_channels
-        self.retina_cls = nn.Conv2d(
-            in_channels,
-            self.num_base_priors * self.cls_out_channels,
-            3,
-            padding=1)
+
+        self.retina_cls = deepcopy(self.retina_cls)
+        self.retina_cls.update({'in_channels': in_channels,
+                                'num_base_priors': self.num_base_priors,
+                                'out_channels': self.cls_out_channels})
+        self.retina_cls = MODELS.build(self.retina_cls)
         reg_dim = self.bbox_coder.encode_size
         self.retina_reg = nn.Conv2d(
             in_channels, self.num_base_priors * reg_dim, 3, padding=1)

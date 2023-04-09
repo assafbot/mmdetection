@@ -1,4 +1,6 @@
-_base_ = './retinanet_r50_fpn_1x_coco.py'
+_base_ = [
+    './retinanet_r50_fpn_32xb2-1x_openimages_lr002.py'
+]
 
 # model settings
 model = dict(
@@ -13,11 +15,10 @@ model = dict(
         _delete_=True,
         type='ClipResNet',
         out_indices=(1, 2, 3, 4),
-        frozen_stages=1,
+        model_name='RN50x4',
+        frozen_stages=4,
         norm_eval=True,
-
-        # workaround for empty init_cfg issue. doesn't do anything
-        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')
+        init_cfg=dict(type='Pretrained', checkpoint='mentee://mmdetection/pretrained/RN50x4_openai.pth')
     ),
     neck=dict(
         _delete_=True,

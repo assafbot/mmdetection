@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from copy import deepcopy
 from typing import Optional, Tuple, Union
 
 import mmcv
@@ -15,6 +16,21 @@ from mmdet.registry import TRANSFORMS
 from mmdet.structures.bbox import get_box_type
 from mmdet.structures.bbox.box_type import autocast_box_type
 from mmdet.structures.mask import BitmapMasks, PolygonMasks
+
+INSTANCE_KEYS = ('gt_bboxes', 'gt_bboxes_labels', 'gt_masks', 'gt_ignore_flags', 'instances')
+
+
+def _filter_results(results, keep):
+    l = len(results[INSTANCE_KEYS[0]])
+    for key in INSTANCE_KEYS:
+        if key in results:
+            assert len(results[key]) == l
+            if isinstance(results[key], list):
+                results[key] = [x for x, k in zip(results[key], keep) if k]
+            else:
+                results[key] = results[key][keep]
+
+    return results
 
 
 @TRANSFORMS.register_module()
@@ -737,12 +753,7 @@ class FilterAnnotations(BaseTransform):
             if self.keep_empty:
                 return None
 
-        keys = ('gt_bboxes', 'gt_bboxes_labels', 'gt_masks', 'gt_ignore_flags')
-        for key in keys:
-            if key in results:
-                results[key] = results[key][keep]
-
-        return results
+        return _filter_results(results, keep)
 
     def __repr__(self):
         return self.__class__.__name__ + \
@@ -874,3 +885,18 @@ class InferencerLoader(BaseTransform):
         if 'img' in inputs:
             return self.from_ndarray(inputs)
         return self.from_file(inputs)
+
+
+@TRANSFORMS.register_module()
+class AddMissingKeys(BaseTransform):
+    def __init__(self, **keys):
+        self.keys = keys
+
+    def transform(self, results: Union[str, np.ndarray, dict]) -> dict:
+        for key, value in self.keys.items():
+            if key in results:
+                continue
+
+            results[key] = deepcopy(value)
+
+        return results

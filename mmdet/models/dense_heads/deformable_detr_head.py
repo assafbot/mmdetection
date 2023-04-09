@@ -5,12 +5,13 @@ from typing import Dict, List, Tuple
 import torch
 import torch.nn as nn
 from mmcv.cnn import Linear
-from mmengine.model import bias_init_with_prob, constant_init
+from mmengine.model import bias_init_with_prob, constant_init, ModuleList
 from torch import Tensor
 
 from mmdet.registry import MODELS
 from mmdet.structures import SampleList
 from mmdet.utils import InstanceList, OptInstanceList
+from .class_predictors import LinearClassPredictor
 from ..layers import inverse_sigmoid
 from .detr_head import DETRHead
 
@@ -49,7 +50,9 @@ class DeformableDETRHead(DETRHead):
 
     def _init_layers(self) -> None:
         """Initialize classification branch and regression branch of head."""
-        fc_cls = Linear(self.embed_dims, self.cls_out_channels)
+        fc_cls = copy.deepcopy(self.fc_cls)
+        fc_cls.update({'in_channels': self.embed_dims, 'out_channels': self.cls_out_channels})
+        fc_cls = MODELS.build(fc_cls)
         reg_branch = []
         for _ in range(self.num_reg_fcs):
             reg_branch.append(Linear(self.embed_dims, self.embed_dims))
@@ -58,12 +61,12 @@ class DeformableDETRHead(DETRHead):
         reg_branch = nn.Sequential(*reg_branch)
 
         if self.share_pred_layer:
-            self.cls_branches = nn.ModuleList(
+            self.cls_branches = ModuleList(
                 [fc_cls for _ in range(self.num_pred_layer)])
             self.reg_branches = nn.ModuleList(
                 [reg_branch for _ in range(self.num_pred_layer)])
         else:
-            self.cls_branches = nn.ModuleList(
+            self.cls_branches = ModuleList(
                 [copy.deepcopy(fc_cls) for _ in range(self.num_pred_layer)])
             self.reg_branches = nn.ModuleList([
                 copy.deepcopy(reg_branch) for _ in range(self.num_pred_layer)
@@ -71,10 +74,12 @@ class DeformableDETRHead(DETRHead):
 
     def init_weights(self) -> None:
         """Initialize weights of the Deformable DETR head."""
+        super().init_weights()
         if self.loss_cls.use_sigmoid:
             bias_init = bias_init_with_prob(0.01)
             for m in self.cls_branches:
-                nn.init.constant_(m.bias, bias_init)
+                if isinstance(m, LinearClassPredictor):
+                    nn.init.constant_(m.pred.bias, bias_init)
         for m in self.reg_branches:
             constant_init(m[-1], 0, bias=0)
         nn.init.constant_(self.reg_branches[0][-1].bias.data[2:], -2.0)

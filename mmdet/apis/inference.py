@@ -169,8 +169,8 @@ def inference_detector(
         # build the data pipeline
         data_ = test_pipeline(data_)
 
-        data_['inputs'] = [data_['inputs']]
-        data_['data_samples'] = [data_['data_samples']]
+        for key in data_.keys():
+            data_[key] = [data_[key]]
 
         # forward the model
         with torch.no_grad():

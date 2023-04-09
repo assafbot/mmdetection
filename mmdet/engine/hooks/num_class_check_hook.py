@@ -3,6 +3,7 @@ from mmcv.cnn import VGG
 from mmengine.hooks import Hook
 from mmengine.runner import Runner
 
+from mmdet.models import OWLViTHead
 from mmdet.registry import HOOKS
 
 
@@ -40,7 +41,7 @@ class NumClassCheckHook(Hook):
             for name, module in model.named_modules():
                 if hasattr(module, 'num_classes') and not name.endswith(
                         'rpn_head') and not isinstance(
-                            module, (VGG, FusedSemanticHead)):
+                            module, (VGG, FusedSemanticHead, OWLViTHead)):
                     assert module.num_classes == len(classes), \
                         (f'The `num_classes` ({module.num_classes}) in '
                          f'{module.__class__.__name__} of '

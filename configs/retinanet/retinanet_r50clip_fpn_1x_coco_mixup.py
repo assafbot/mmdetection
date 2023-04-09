@@ -1,4 +1,4 @@
-_base_ = './retinanet_r50_fpn_1x_coco_clip.py'
+_base_ = './retinanet_r50_fpn_1x_coco_mixup.py'
 
 # model settings
 model = dict(
@@ -13,18 +13,15 @@ model = dict(
         _delete_=True,
         type='ClipResNet',
         out_indices=(1, 2, 3, 4),
+        model_name='RN50',
         frozen_stages=1,
         norm_eval=True,
-
-        # workaround for empty init_cfg issue. doesn't do anything
-        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')
-    ),
-    neck=dict(
-        _delete_=True,
-        type='FPN',
-        in_channels=[256, 640, 1280, 2560],
-        out_channels=256,
-        start_level=1,
-        add_extra_convs='on_input',
-        num_outs=5)
+        init_cfg=dict(type='Pretrained', checkpoint='mentee://mmdetection/pretrained/RN50_openai.pth')
+    )
 )
+
+# optimizer
+optim_wrapper = dict(
+    type='OptimWrapper',
+    optimizer=dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001),
+    clip_grad=dict(max_norm=35, norm_type=2))

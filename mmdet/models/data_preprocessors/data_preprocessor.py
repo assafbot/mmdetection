@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from mmengine.dist import barrier, broadcast, get_dist_info
 from mmengine.logging import MessageHub
 from mmengine.model import BaseDataPreprocessor, ImgDataPreprocessor
+from mmengine.model import stack_batch
 from mmengine.structures import PixelData
 from mmengine.utils import is_seq_of
 from torch import Tensor
@@ -122,6 +123,12 @@ class DetDataPreprocessor(ImgDataPreprocessor):
         data = super().forward(data=data, training=training)
         inputs, data_samples = data['inputs'], data['data_samples']
 
+        for key in data.keys():
+            if key in ['inputs', 'data_samples']:
+                continue
+            if is_seq_of(data[key], torch.Tensor):
+                data[key] = stack_batch(data[key])
+
         if data_samples is not None:
             # NOTE the batched image size information may be useful, e.g.
             # in DETR, this is needed for the construction of masks, which is
@@ -146,7 +153,8 @@ class DetDataPreprocessor(ImgDataPreprocessor):
             for batch_aug in self.batch_augments:
                 inputs, data_samples = batch_aug(inputs, data_samples)
 
-        return {'inputs': inputs, 'data_samples': data_samples}
+        data['inputs'], data['data_samples'] = inputs, data_samples
+        return data
 
     def _get_pad_shape(self, data: dict) -> List[tuple]:
         """Get the pad_shape of each image based on data and

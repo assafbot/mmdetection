@@ -52,6 +52,7 @@ class ChannelMapper(BaseModule):
         in_channels: List[int],
         out_channels: int,
         kernel_size: int = 3,
+        extra_convs_kernel: int = 3,
         conv_cfg: OptConfigType = None,
         norm_cfg: OptConfigType = None,
         act_cfg: OptConfigType = dict(type='ReLU'),
@@ -86,9 +87,9 @@ class ChannelMapper(BaseModule):
                     ConvModule(
                         in_channel,
                         out_channels,
-                        3,
+                        extra_convs_kernel,
                         stride=2,
-                        padding=1,
+                        padding=(extra_convs_kernel - 1) // 2,
                         conv_cfg=conv_cfg,
                         norm_cfg=norm_cfg,
                         act_cfg=act_cfg))

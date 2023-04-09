@@ -19,7 +19,7 @@ try:
     import lvis
     if getattr(lvis, '__version__', '0') >= '10.5.3':
         warnings.warn(
-            'mmlvis is deprecated, please install official lvis-api by "pip install git+https://github.com/lvis-dataset/lvis-api.git"',  # noqa: E501
+            'mmlvis is deprecated, please install official lvis-api by "pip install git+https://github.com/assafbot/lvis-api.git"',  # noqa: E501
             UserWarning)
     from lvis import LVIS, LVISEval, LVISResults
 except ImportError:
@@ -80,7 +80,7 @@ class LVISMetric(CocoMetric):
         if lvis is None:
             raise RuntimeError(
                 'Package lvis is not installed. Please run "pip install '
-                'git+https://github.com/lvis-dataset/lvis-api.git".')
+                'git+https://github.com/assafbot/lvis-api.git".')
         super().__init__(collect_device=collect_device, prefix=prefix)
         # coco evaluation metrics
         self.metrics = metric if isinstance(metric, list) else [metric]

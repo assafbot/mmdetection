@@ -1,12 +1,9 @@
-_base_ = [
-    '../_base_/datasets/openimages_detection.py', '../_base_/default_runtime.py'
-]
 model = dict(
     type='DeformableDETR',
     num_queries=300,
     num_feature_levels=4,
-    with_box_refine=True,
-    as_two_stage=True,
+    with_box_refine=False,
+    as_two_stage=False,
     data_preprocessor=dict(
         type='DetDataPreprocessor',
         mean=[123.675, 116.28, 103.53],
@@ -57,7 +54,7 @@ model = dict(
     positional_encoding=dict(num_feats=128, normalize=True, offset=-0.5),
     bbox_head=dict(
         type='DeformableDETRHead',
-        num_classes=601,
+        num_classes=80,
         sync_cls_avg_factor=True,
         loss_cls=dict(
             type='FocalLoss',
@@ -76,52 +73,7 @@ model = dict(
                 dict(type='BBoxL1Cost', weight=5.0, box_format='xywh'),
                 dict(type='IoUCost', iou_mode='giou', weight=2.0)
             ])),
-    test_cfg=dict(max_per_img=100))
-
-# train_pipeline, NOTE the img_scale and the Pad's size_divisor is different
-# from the default setting in mmdet.
-train_pipeline = [
-    dict(
-        type='LoadImageFromFile',
-        file_client_args={{_base_.file_client_args}}),
-    dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='RandomFlip', prob=0.5),
-    dict(
-        type='RandomChoice',
-        transforms=[
-            [
-                dict(
-                    type='RandomChoiceResize',
-                    scales=[(480, 1333), (512, 1333), (544, 1333), (576, 1333),
-                            (608, 1333), (640, 1333), (672, 1333), (704, 1333),
-                            (736, 1333), (768, 1333), (800, 1333)],
-                    keep_ratio=True)
-            ],
-            [
-                dict(
-                    type='RandomChoiceResize',
-                    # The radio of all image in train dataset < 7
-                    # follow the original implement
-                    scales=[(400, 4200), (500, 4200), (600, 4200)],
-                    keep_ratio=True),
-                dict(
-                    type='RandomCrop',
-                    crop_type='absolute_range',
-                    crop_size=(384, 600),
-                    allow_negative_crop=True),
-                dict(
-                    type='RandomChoiceResize',
-                    scales=[(480, 1333), (512, 1333), (544, 1333), (576, 1333),
-                            (608, 1333), (640, 1333), (672, 1333), (704, 1333),
-                            (736, 1333), (768, 1333), (800, 1333)],
-                    keep_ratio=True)
-            ]
-        ]),
-    dict(type='PackDetInputs')
-]
-train_dataloader = dict(
-    dataset=dict(
-        filter_cfg=dict(filter_empty_gt=False), pipeline=train_pipeline))
+    test_cfg=dict(max_per_img=300))
 
 # optimizer
 optim_wrapper = dict(
@@ -142,30 +94,17 @@ train_cfg = dict(
 val_cfg = dict(type='ValLoop')
 test_cfg = dict(type='TestLoop')
 
-# learning rate
 param_scheduler = [
-    dict(
-        type='LinearLR',
-        start_factor=1.0 / 64,
-        by_epoch=False,
-        begin=0,
-        end=26000),
     dict(
         type='MultiStepLR',
         begin=0,
-        end=12,
+        end=max_epochs,
         by_epoch=True,
-        milestones=[8, 11],
+        milestones=[40],
         gamma=0.1)
 ]
 
-# optimizer
-optim_wrapper = dict(
-    type='OptimWrapper',
-    optimizer=dict(type='SGD', lr=0.08, momentum=0.9, weight_decay=0.0001),
-    clip_grad=dict(max_norm=35, norm_type=2))
-
 # NOTE: `auto_scale_lr` is for automatically scaling LR,
 # USER SHOULD NOT CHANGE ITS VALUES.
-# base_batch_size = (32 GPUs) x (2 samples per GPU)
-auto_scale_lr = dict(base_batch_size=64)
+# base_batch_size = (16 GPUs) x (2 samples per GPU)
+auto_scale_lr = dict(base_batch_size=32, enable=False)
