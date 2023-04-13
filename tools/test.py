@@ -13,6 +13,7 @@ from mmdet.engine import ClearMLLoggerHook
 from mmdet.engine.hooks.utils import trigger_visualization_hook
 from mmdet.evaluation import DumpDetResults
 from mmdet.registry import RUNNERS
+from mmdet.utils import setup_cache_size_limit_of_dynamo
 
 
 # TODO: support fuse_conv_bn and format_only
@@ -53,7 +54,10 @@ def parse_args():
         default='none',
         help='job launcher')
     parser.add_argument('--tta', action='store_true')
-    parser.add_argument('--local_rank', type=int, default=0)
+    # When using PyTorch version >= 2.0.0, the `torch.distributed.launch`
+    # will pass the `--local-rank` parameter to `tools/train.py` instead
+    # of `--local_rank`.
+    parser.add_argument('--local_rank', '--local-rank', type=int, default=0)
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -62,6 +66,10 @@ def parse_args():
 
 def main():
     args = parse_args()
+
+    # Reduce the number of repeated compilations and improve
+    # testing speed.
+    setup_cache_size_limit_of_dynamo()
 
     # load config
     cfg = Config.fromfile(args.config)

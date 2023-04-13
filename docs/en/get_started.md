@@ -44,7 +44,7 @@ We recommend that users follow our best practices to install MMDetection. Howeve
 ```shell
 pip install -U openmim
 mim install mmengine
-mim install "mmcv>=2.0.0rc1"
+mim install "mmcv>=2.0.0"
 ```
 
 **Note:** In MMCV-v2.x, `mmcv-full` is rename to `mmcv`, if you want to install `mmcv` without CUDA ops, you can use `mim install "mmcv-lite>=2.0.0rc1"` to install the lite version.
@@ -54,8 +54,7 @@ mim install "mmcv>=2.0.0rc1"
 Case a: If you develop and run mmdet directly, install it from source:
 
 ```shell
-git clone https://github.com/open-mmlab/mmdetection.git -b 3.x
-# "-b 3.x" means checkout to the `3.x` branch.
+git clone https://github.com/open-mmlab/mmdetection.git
 cd mmdetection
 pip install -v -e .
 # "-v" means verbose, or more output
@@ -66,7 +65,7 @@ pip install -v -e .
 Case b: If you use mmdet as a dependency or third-party package, install it with MIM:
 
 ```shell
-mim install "mmdet>=3.0.0rc0"
+mim install mmdet
 ```
 
 ## Verify the installation
@@ -76,17 +75,17 @@ To verify whether MMDetection is installed correctly, we provide some sample cod
 **Step 1.** We need to download config and checkpoint files.
 
 ```shell
-mim download mmdet --config yolov3_mobilenetv2_8xb24-320-300e_coco --dest .
+mim download mmdet --config rtmdet_tiny_8xb32-300e_coco --dest .
 ```
 
-The downloading will take several seconds or more, depending on your network environment. When it is done, you will find two files `yolov3_mobilenetv2_8xb24-320-300e_coco.py` and `yolov3_mobilenetv2_320_300e_coco_20210719_215349-d18dff72.pth` in your current folder.
+The downloading will take several seconds or more, depending on your network environment. When it is done, you will find two files `rtmdet_tiny_8xb32-300e_coco.py` and `rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth` in your current folder.
 
 **Step 2.** Verify the inference demo.
 
 Case a: If you install MMDetection from source, just run the following command.
 
 ```shell
-python demo/image_demo.py demo/demo.jpg yolov3_mobilenetv2_8xb24-320-300e_coco.py --weights yolov3_mobilenetv2_320_300e_coco_20210719_215349-d18dff72.pth --device cpu
+python demo/image_demo.py demo/demo.jpg rtmdet_tiny_8xb32-300e_coco.py --weights rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth --device cpu
 ```
 
 You will see a new image `demo.jpg` on your `./outputs/vis` folder, where bounding boxes are plotted on cars, benches, etc.
@@ -96,8 +95,8 @@ Case b: If you install MMDetection with MIM, open your python interpreter and co
 ```python
 from mmdet.apis import init_detector, inference_detector
 
-config_file = 'yolov3_mobilenetv2_8xb24-320-300e_coco.py'
-checkpoint_file = 'yolov3_mobilenetv2_320_300e_coco_20210719_215349-d18dff72.pth'
+config_file = 'rtmdet_tiny_8xb32-300e_coco.py'
+checkpoint_file = 'rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth'
 model = init_detector(config_file, checkpoint_file, device='cpu')  # or device='cuda:0'
 inference_detector(model, 'demo/demo.jpg')
 ```
@@ -138,7 +137,7 @@ To install MMCV with pip instead of MIM, please follow [MMCV installation guides
 For example, the following command installs MMCV built for PyTorch 1.12.x and CUDA 11.6.
 
 ```shell
-pip install "mmcv>=2.0.0rc1" -f https://download.openmmlab.com/mmcv/dist/cu116/torch1.12.0/index.html
+pip install "mmcv>=2.0.0" -f https://download.openmmlab.com/mmcv/dist/cu116/torch1.12.0/index.html
 ```
 
 #### Install on CPU-only platforms
@@ -180,13 +179,13 @@ thus we only need to install MMEngine, MMCV, and MMDetection with the following 
 ```shell
 !pip3 install openmim
 !mim install mmengine
-!mim install "mmcv>=2.0.0rc1,<2.1.0"
+!mim install "mmcv>=2.0.0,<2.1.0"
 ```
 
 **Step 2.** Install MMDetection from the source.
 
 ```shell
-!git clone https://github.com/open-mmlab/mmdetection.git -b 3.x
+!git clone https://github.com/open-mmlab/mmdetection.git
 %cd mmdetection
 !pip install -e .
 ```
@@ -196,7 +195,7 @@ thus we only need to install MMEngine, MMCV, and MMDetection with the following 
 ```python
 import mmdet
 print(mmdet.__version__)
-# Example output: 3.0.0rc0, or an another version.
+# Example output: 3.0.0, or an another version.
 ```
 
 ```{note}
