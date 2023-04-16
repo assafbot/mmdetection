@@ -159,8 +159,9 @@ class ClipResNet(BaseModule):
                     m.eval()
 
     def forward(self, x):
+        max_idx = max(self.out_indices)
         outputs = []
-        for idx, layer in enumerate(self.layers):
+        for idx, layer in enumerate(self.layers[:max_idx+1]):
             x = layer(x)
             if idx in self.out_indices:
                 outputs.append(x)
