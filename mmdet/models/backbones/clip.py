@@ -31,8 +31,8 @@ class ClipViT(BaseModule):
         self.vit.ln_post = torch.nn.Identity()
 
         # Save original parameters
-        self.positional_embedding = torch.nn.Parameter(self.vit.positional_embedding, requires_grad=False)
-        self.vit.positional_embedding.requires_grad = False
+        self.positional_embedding = torch.nn.Parameter(self.vit.positional_embedding)
+        delattr(self.vit, 'positional_embedding')
         self.grid_size = self.vit.grid_size
         self.image_size = self.vit.image_size
 
@@ -56,7 +56,7 @@ class ClipViT(BaseModule):
         grid_emb = grid_emb[0].permute(1, 2, 0)
         grid_emb = grid_emb.flatten(0, 1)
         pe = torch.cat((cls_emb, grid_emb))
-        self.vit.positional_embedding = torch.nn.Parameter(pe, requires_grad=False)
+        self.vit.positional_embedding = pe
 
         token, features = self.vit(x)
 
