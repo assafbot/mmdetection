@@ -223,8 +223,8 @@ class QueryClipLinearClassPredictor(BaseModule):
         self.freeze_text = freeze_text
         self.ensemble_mode = ensemble_mode
 
-        if model_name is None or pretrained is None:
-            raise ValueError(f'model_name and pretrained must be specified for {self.__class__.__name__}')
+        if model_name is None:
+            raise ValueError(f'model_name must be specified for {self.__class__.__name__}')
 
         self.model = open_clip.create_model(model_name, pretrained=pretrained)
         self.model.visual = None
