@@ -14,7 +14,8 @@ except ImportError:
 
 @MODELS.register_module()
 class ClipViT(BaseModule):
-    def __init__(self, model_name, pretrained=None, init_cfg=None, frozen_stages=-1, norm_eval=False, final_ln_post=True):
+    def __init__(self, model_name, pretrained=None, init_cfg=None, frozen_stages=-1, norm_eval=False,
+                 final_ln_post=True, pos_emb_requires_grad=False):
         super(ClipViT, self).__init__(init_cfg)
         if open_clip is None:
             raise ImportError(f'Please run "pip install open_clip_torch" to use {self.__class__.__name__}')
@@ -31,7 +32,7 @@ class ClipViT(BaseModule):
         self.vit.ln_post = torch.nn.Identity()
 
         # Save original parameters
-        self.positional_embedding = torch.nn.Parameter(self.vit.positional_embedding)
+        self.positional_embedding = torch.nn.Parameter(self.vit.positional_embedding, requires_grad=pos_emb_requires_grad)
         delattr(self.vit, 'positional_embedding')
         self.grid_size = self.vit.grid_size
         self.image_size = self.vit.image_size
