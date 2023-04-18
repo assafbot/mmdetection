@@ -47,17 +47,18 @@ class ClipViT(BaseModule):
         patch_height, patch_width = self.vit.patch_size
         self.vit.grid_size = (image_height // patch_height, image_width // patch_width)
 
-        pe = self.positional_embedding
-        assert pe.shape[0] == self.grid_size[0] * self.grid_size[1] + 1
-        cls_emb = pe[:1]
-        grid_emb = pe[1:]
-        grid_emb = grid_emb.reshape(*self.grid_size[::-1], -1)
-        grid_emb = grid_emb.permute(2, 0, 1)[None]
-        grid_emb = torch.nn.functional.interpolate(grid_emb, self.vit.grid_size, mode='bilinear')
-        grid_emb = grid_emb[0].permute(1, 2, 0)
-        grid_emb = grid_emb.flatten(0, 1)
-        pe = torch.cat((cls_emb, grid_emb))
-        self.vit.positional_embedding = pe
+        with torch.set_grad_enabled(self.positional_embedding.requires_grad):
+            pe = self.positional_embedding
+            assert pe.shape[0] == self.grid_size[0] * self.grid_size[1] + 1
+            cls_emb = pe[:1]
+            grid_emb = pe[1:]
+            grid_emb = grid_emb.reshape(*self.grid_size[::-1], -1)
+            grid_emb = grid_emb.permute(2, 0, 1)[None]
+            grid_emb = torch.nn.functional.interpolate(grid_emb, self.vit.grid_size, mode='bilinear')
+            grid_emb = grid_emb[0].permute(1, 2, 0)
+            grid_emb = grid_emb.flatten(0, 1)
+            pe = torch.cat((cls_emb, grid_emb))
+            self.vit.positional_embedding = pe
 
         token, features = self.vit(x)
 
