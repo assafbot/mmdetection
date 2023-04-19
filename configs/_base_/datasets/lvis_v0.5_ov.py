@@ -39,7 +39,7 @@ test_pipeline = [
     dict(type='AddMissingKeys', pos_label_ids=list(range(num_classes)),
          neg_label_ids=[],
          not_exhaustive_label_ids=[],
-         metainfo=dict()),
+         metainfo=dict(classes=LVIS_V1_DATASET_CLASSES)),
     dict(type='AddQuerySet', num_queries=None),
     dict(type='PackDetInputs', additional_input_keys=['query'],
          meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape', 'scale_factor',
