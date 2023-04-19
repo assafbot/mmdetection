@@ -1,5 +1,5 @@
-model_name = 'RN50'
-pretrained = 'openai'
+model_name = 'convnext_base'
+pretrained = 'laion400m_s13b_b51k'
 
 model = dict(
     type='OWLViT',
@@ -10,15 +10,15 @@ model = dict(
         bgr_to_rgb=True,
         pad_size_divisor=32),
     backbone=dict(
-        type='ClipResNet',
+        type='ClipConvNext',
         model_name=model_name,
         pretrained=pretrained,
-        frozen_stages=1,
+        frozen_stages=-1,
         norm_eval=True,
         init_cfg=dict(type='Pretrained', checkpoint=f'mentee://mmdetection/pretrained/{model_name}_{pretrained}.pth')),
     bbox_head=dict(
         type='OWLViTHead',
-        embed_dims=2048,
+        embed_dims=1024,
         sync_cls_avg_factor=True,
         loss_cls=dict(
             type='FocalLoss',

@@ -213,3 +213,56 @@ class ClipResNet(BaseModule):
             outputs.append(features)
 
         return tuple(outputs)
+
+
+@MODELS.register_module()
+class ClipConvNext(BaseModule):
+    def __init__(self, model_name, pretrained=None, out_indices=None, frozen_stages=-1, norm_eval=True,
+                 bn_requires_grad=True, init_cfg=None):
+        super(ClipConvNext, self).__init__(init_cfg)
+        if open_clip is None:
+            raise ImportError(f'Please run "pip install open_clip_torch" to use {self.__class__.__name__}')
+
+        model = open_clip.create_model(model_name, pretrained)
+        cn = model.visual.trunk
+        self.layers = ModuleList([cn.stem] + list(cn.stages))
+        self.out_indices = list(sorted(out_indices or [len(self.layers)-1]))
+        self.frozen_stages = frozen_stages
+        self.norm_eval = norm_eval
+
+        if not bn_requires_grad:
+            for m in self.modules():
+                if isinstance(m, _BatchNorm):
+                    for param in m.parameters():
+                        param.requires_grad = False
+
+        self._freeze_stages()
+
+    def _freeze_stages(self):
+        for i in range(max(self.frozen_stages, -1) + 1):
+            m = self.layers[i]
+            self._freeze_layer(m)
+
+    def _freeze_layer(self, m):
+        m.eval()
+        for param in m.parameters():
+            param.requires_grad = False
+
+    def train(self, mode=True):
+        super(ClipConvNext, self).train(mode)
+        self._freeze_stages()
+        if mode and self.norm_eval:
+            for m in self.modules():
+                # trick: eval have effect on BatchNorm only
+                if isinstance(m, _BatchNorm):
+                    m.eval()
+
+    def forward(self, x):
+        max_idx = max(self.out_indices)
+        outputs = []
+        for idx, layer in enumerate(self.layers[:max_idx+1]):
+            x = layer(x)
+            if idx in self.out_indices:
+                outputs.append(x)
+
+        return tuple(outputs)
