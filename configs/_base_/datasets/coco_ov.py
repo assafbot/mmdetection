@@ -11,10 +11,10 @@ num_queries = num_classes = 80
 #         'data/': 's3://openmmlab/datasets/detection/'
 #     }))
 
-file_client_args = dict(backend='disk')
+backend_args = None
 
 train_pipeline = [
-    dict(type='LoadImageFromFile', file_client_args=file_client_args),
+    dict(type='LoadImageFromFile', backend_args=backend_args),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(
         type='RandomChoiceResize',
@@ -32,7 +32,7 @@ train_pipeline = [
                     'query_mapping'))
 ]
 test_pipeline = [
-    dict(type='LoadImageFromFile', file_client_args=file_client_args),
+    dict(type='LoadImageFromFile', backend_args=backend_args),
     dict(type='Resize', scale=(1333, 800), keep_ratio=True),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(type='AddMissingKeys', pos_label_ids=[],
@@ -57,7 +57,8 @@ train_dataloader = dict(
         ann_file='annotations/instances_train2017.json',
         data_prefix=dict(img='train2017/'),
         filter_cfg=dict(filter_empty_gt=True, min_size=32),
-        pipeline=train_pipeline))
+        pipeline=train_pipeline,
+        backend_args=backend_args))
 val_dataloader = dict(
     batch_size=1,
     num_workers=2,
