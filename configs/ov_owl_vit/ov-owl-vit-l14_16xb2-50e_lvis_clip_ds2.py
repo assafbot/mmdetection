@@ -1,4 +1,4 @@
-_base_ = 'ov-owl-vit-l14_16xb2-50e_lvis_clip_ds2.py'
+_base_ = 'ov-owl-vit-b32_16xb2-50e_lvis_clip_ds2.py'
 
 model_name = 'ViT-L-14'
 pretrained = 'openai'
