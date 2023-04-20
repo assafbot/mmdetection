@@ -8,6 +8,7 @@ model = dict(
         model_name=model_name,
         pretrained=pretrained),
     bbox_head=dict(
+        embed_dims=1024,
         fc_cls=dict(
             model_name=model_name,
             pretrained=pretrained)))
