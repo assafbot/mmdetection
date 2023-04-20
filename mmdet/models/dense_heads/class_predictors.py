@@ -1,6 +1,5 @@
 import torch
 from mmengine.model import BaseModule, bias_init_with_prob
-from torch import nn
 
 from mmdet.models.layers.scale import ScaleLayer
 from mmdet.registry import MODELS, DATASETS
@@ -18,8 +17,8 @@ class ConvClassPredictor(BaseModule):
                  kernel_size=1, padding=0,
                  init_cfg=dict(type='Normal', layer='Conv2d', std=0.01, bias_prob=0.01)):
         super().__init__(init_cfg=init_cfg)
-        self.conv = nn.Conv2d(in_channels, num_base_priors * out_channels,
-                              kernel_size=kernel_size, padding=padding)
+        self.conv = torch.nn.Conv2d(in_channels, num_base_priors * out_channels,
+                                    kernel_size=kernel_size, padding=padding)
 
     def forward(self, tensor, query):
         if query is not None:
@@ -31,7 +30,7 @@ class ConvClassPredictor(BaseModule):
 class LinearClassPredictor(BaseModule):
     def __init__(self, in_channels, out_channels, init_cfg=None, num_outputs=None):
         super().__init__(init_cfg=init_cfg)
-        self.pred = nn.Linear(in_channels, num_outputs if num_outputs is not None else out_channels)
+        self.pred = torch.nn.Linear(in_channels, num_outputs if num_outputs is not None else out_channels)
 
     def forward(self, tensor, query):
         logits = self.pred(tensor)
@@ -90,7 +89,7 @@ class AbstractClipClassPredictor(BaseModule):
             class_embeddings = self._get_class_embeddings(class_names)
             num_classes = class_embeddings.shape[0] // len(self.templates)
             assert num_classes == self.out_channels, 'mismatch between expected output size and number of classes'
-            pred = nn.Linear(self.emb_dim, class_embeddings.shape[0], bias=False)
+            pred = torch.nn.Linear(self.emb_dim, class_embeddings.shape[0], bias=False)
             pred.weight[:] = class_embeddings
             pred.weight.requires_grad = False
             pred.to(next(self.parameters()).device)
@@ -167,7 +166,7 @@ class ClipConvClassPredictor(AbstractClipClassPredictor):
                  init_cfg=[dict(type='Normal', layer='Conv2d', std=0.01),
                            dict(type='Constant', layer='ScaleLayer', val=1, bias=bias_init_with_prob(0.01))], **kwargs):
         super().__init__(in_channels=in_channels, out_channels=out_channels, init_cfg=init_cfg, **kwargs)
-        self.proj = nn.Conv2d(in_channels, num_base_priors * self.emb_dim, 3, padding=1)
+        self.proj = torch.nn.Conv2d(in_channels, num_base_priors * self.emb_dim, 3, padding=1)
 
     def _forward(self, x, query):
         if query is not None:
@@ -193,7 +192,7 @@ class ClipLinearClassPredictor(AbstractClipClassPredictor):
     def __init__(self, in_channels, out_channels,
                  init_cfg=[dict(type='Constant', layer='ScaleLayer', val=1, bias=bias_init_with_prob(0.01))], **kwargs):
         super().__init__(in_channels=in_channels, out_channels=out_channels, init_cfg=init_cfg, **kwargs)
-        self.proj = nn.Linear(in_channels, self.emb_dim)
+        self.proj = torch.nn.Linear(in_channels, self.emb_dim)
 
     def _forward(self, x, query):
         if query is not None:
@@ -231,7 +230,7 @@ class QueryClipLinearClassPredictor(BaseModule):
         self.model.logit_scale = None
 
         self.emb_dim = self.model.text_projection.shape[1]
-        self.proj = nn.Linear(in_channels, self.emb_dim)
+        self.proj = torch.nn.Linear(in_channels, self.emb_dim)
         self.scale = ScaleLayer(scale=scale, bias=bias, in_channels=in_channels)
 
         self._freeze()
