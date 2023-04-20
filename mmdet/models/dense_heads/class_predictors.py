@@ -248,18 +248,18 @@ class QueryClipLinearClassPredictor(BaseModule):
         for p in self.model.parameters():
             p.requires_grad = False
 
-    def forward(self, x, query):
+    def forward(self, image_feats, query):
         if query.shape[3] != self.emb_dim:
             text_emb = self.encode_query(query)
         else:
             text_emb = query
 
-        image_emb = self.proj(x)
+        image_emb = self.proj(image_feats)
         if self.norm_image:
             image_emb = image_emb / (image_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
 
-        logits = torch.einsum('...wc,...qec->...weq', image_emb, text_emb)
-        logits = self.scale(logits, x)
+        logits = self._compute_logits(image_emb, text_emb)
+        logits = self.scale(logits, image_feats)
 
         n, w, e, q = logits.shape
         if e == 1:
@@ -273,6 +273,9 @@ class QueryClipLinearClassPredictor(BaseModule):
 
         return logits
 
+    def _compute_logits(self, image_emb, text_emb):
+        return torch.einsum('...wc,...qec->...weq', image_emb, text_emb)
+
     def encode_query(self, query):
         n, q, e, _ = query.shape
         text_emb = self.model.encode_text(query.flatten(0, 2))
@@ -280,3 +283,23 @@ class QueryClipLinearClassPredictor(BaseModule):
         if self.norm_text:
             text_emb = text_emb / (text_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
         return text_emb
+
+
+@MODELS.register_module()
+class QueryClipTransformerClassPredictor(QueryClipLinearClassPredictor):
+    def __init__(self, d_model: int = 512, nhead: int = 8, num_decoder_layers: int = 6, dim_feedforward: int = 512,
+                 dropout: float = 0., activation=torch.nn.functional.relu, layer_norm_eps: float = 1e-5,
+                 batch_first: bool = False, norm_first: bool = False, **kwargs):
+        super().__init__(**kwargs)
+        decoder_layer = torch.nn.TransformerDecoderLayer(d_model, nhead, dim_feedforward, dropout,
+                                                         activation, layer_norm_eps, batch_first, norm_first)
+        decoder_norm = torch.nn. LayerNorm(d_model, eps=layer_norm_eps)
+        self.decoder = torch.nn.TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm)
+
+    def _compute_logits(self, image_emb, text_emb):
+        n, q, e, d = text_emb.shape
+        _, w, _ = image_emb.shape
+        text_tokens = text_emb.reshape((n, q*e, d)).permute(1, 0, 2)
+        image_tokens = image_emb.permute(1, 0, 2)
+        decoded = self.decoder(image_tokens, text_tokens)
+        return torch.einsum('wbc,bqec->bweq', decoded, text_emb)
