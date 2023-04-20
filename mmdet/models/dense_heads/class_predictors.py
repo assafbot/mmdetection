@@ -254,9 +254,6 @@ class QueryClipLinearClassPredictor(BaseModule):
             text_emb = query
 
         image_emb = self.proj(image_feats)
-        if self.norm_image:
-            image_emb = image_emb / (image_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
-
         logits = self._compute_logits(image_emb, text_emb)
         logits = self.scale(logits, image_feats)
 
@@ -273,6 +270,9 @@ class QueryClipLinearClassPredictor(BaseModule):
         return logits
 
     def _compute_logits(self, image_emb, text_emb):
+        if self.norm_image:
+            image_emb = image_emb / (image_emb.norm(p=2, dim=-1, keepdim=True) + 1e-6)
+
         return torch.einsum('...wc,...qec->...weq', image_emb, text_emb)
 
     def encode_query(self, query):
@@ -301,4 +301,8 @@ class QueryClipTransformerClassPredictor(QueryClipLinearClassPredictor):
         text_tokens = text_emb.reshape((n, q*e, d)).permute(1, 0, 2)
         image_tokens = image_emb.permute(1, 0, 2)
         decoded = self.decoder(image_tokens, text_tokens)
+
+        if self.norm_image:
+            decoded = decoded / (decoded.norm(p=2, dim=-1, keepdim=True) + 1e-6)
+
         return torch.einsum('wbc,bqec->bweq', decoded, text_emb)
