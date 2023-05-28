@@ -176,7 +176,7 @@ class OWLViTHead(BaseModule):
         bias = bias.reshape(1, -1, 4)
         layers_bbox_preds += bias
         layers_bbox_preds = layers_bbox_preds.sigmoid()
-        return layers_cls_scores[None], layers_bbox_preds[None]
+        return layers_cls_scores[None], layers_bbox_preds[None], features[None]
 
     def loss(self, batch_inputs: Tensor, batch_data_samples: SampleList, query: Tensor) -> dict:
         batch_gt_instances = []
@@ -194,6 +194,7 @@ class OWLViTHead(BaseModule):
         self,
         all_layers_cls_scores: Tensor,
         all_layers_bbox_preds: Tensor,
+        all_layers_features: Tensor,
         batch_gt_instances: InstanceList,
         batch_img_metas: List[dict],
         batch_gt_instances_ignore: OptInstanceList = None
@@ -377,6 +378,7 @@ class OWLViTHead(BaseModule):
     def predict_by_feat(self,
                         layer_cls_scores: Tensor,
                         layer_bbox_preds: Tensor,
+                        layer_features: Tensor,
                         batch_img_metas: List[dict],
                         rescale: bool = True) -> InstanceList:
         """Transform network outputs for a batch into bbox predictions.
@@ -408,19 +410,22 @@ class OWLViTHead(BaseModule):
         # and only the outputs from the last decoder layer is used.
         cls_scores = layer_cls_scores[-1]
         bbox_preds = layer_bbox_preds[-1]
+        features = layer_features[-1]
 
         result_list = []
         for img_id in range(len(batch_img_metas)):
             cls_score = cls_scores[img_id]
             bbox_pred = bbox_preds[img_id]
+            feats = features[img_id]
             img_meta = batch_img_metas[img_id]
-            results = self._predict_by_feat_single(cls_score, bbox_pred, img_meta, rescale)
+            results = self._predict_by_feat_single(cls_score, bbox_pred, feats, img_meta, rescale)
             result_list.append(results)
         return result_list
 
     def _predict_by_feat_single(self,
                                 cls_score: Tensor,
                                 bbox_pred: Tensor,
+                                feats: Tensor,
                                 img_meta: dict,
                                 rescale: bool = True) -> InstanceData:
         """Transform outputs from the last decoder layer into bbox predictions
@@ -471,6 +476,7 @@ class OWLViTHead(BaseModule):
                 det_labels = indexes % self.num_classes
                 bbox_index = indexes // self.num_classes
             bbox_pred = bbox_pred[bbox_index]
+            feats = feats[bbox_index]
         else:
             assert not use_category_ids, 'need to implement'
             assert 'query_mapping' not in img_meta, 'need to implement'
@@ -478,6 +484,7 @@ class OWLViTHead(BaseModule):
             scores, bbox_index = scores.topk(max_per_img)
             bbox_pred = bbox_pred[bbox_index]
             det_labels = det_labels[bbox_index]
+            feats = feats[bbox_index]
 
         det_bboxes = bbox_cxcywh_to_xyxy(bbox_pred)
         det_bboxes[:, 0::2] = det_bboxes[:, 0::2] * img_shape[1]
@@ -498,6 +505,8 @@ class OWLViTHead(BaseModule):
         results.bboxes = det_bboxes
         results.scores = scores
         results.labels = det_labels
+        if self.test_cfg.get('output_features', False):
+            results.features = feats
 
         nms = self.test_cfg.get('nms', None)
         if nms is not None:
