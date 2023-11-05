@@ -139,6 +139,22 @@ class CocoDataset(BaseDetDataset):
 
         pos_label_ids = set()
 
+        if 'neg_category_ids' in img_info:
+            data_info['neg_label_ids'] = [
+                self.cat2label[i] for i in img_info['neg_category_ids']]
+
+        if 'not_exhaustive_category_ids' in img_info:
+            data_info['not_exhaustive_label_ids'] = [
+                self.cat2label[i] for i in img_info['not_exhaustive_category_ids']]
+
+        data_info['metainfo'] = self._metainfo
+
+        pos_label_ids = set()
+
+        if self.return_classes:
+            data_info['text'] = self.metainfo['classes']
+            data_info['custom_entities'] = True
+
         instances = []
         for i, ann in enumerate(ann_info):
             instance = {}
